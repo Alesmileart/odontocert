@@ -1,0 +1,45 @@
+{
+  "summary": "OdontoCert MVP tested end-to-end. Backend: 17/17 pytest tests PASSED across Auth (signup/login/me + 401/409), Profile (get/put/persist), Clients CRUD, Materials CRUD, Declarations (create draft/issued, auto-number DC-YYYY-NNNN sequential, list/get/delete, MongoDB _id excluded), Dashboard stats, and per-user data scoping. Frontend (mobile web, 390x844): Signup → Dashboard → Library (add client + material) → New Declaration 5-step wizard (Cliente prefill from library, Dispositivo, Materiali from library, Conformità toggles, Firma) → Save as bozza → Detail screen (DC-2026-0001 with committente/dispositivo/materiali/conformità and 'Esporta / Condividi PDF' button) → Archive listing → filter chips (Tutte/Emesse/Bozze) and search with empty state → Profile save & persistence verified after navigation → Logout works. No red screens, no console errors. Signature pad (WebView) not tested on web preview per instructions; draft path exercised instead. Deprecated packages check: none of expo-av / expo-barcode-scanner / expo-background-fetch used.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/auth/me (no token)", "issue": "Returns 403 (HTTPBearer default) instead of 401. Acceptable but 401 is more conventional for auth failures."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "global", "issues": ["Console shows repeated deprecation warnings: 'shadow*' style props deprecated (use boxShadow) and 'props.pointerEvents' deprecated (use style.pointerEvents). Non-blocking but should be migrated for future RN compatibility."]}
+    ],
+    "react_native_issues": [
+      {"component": "shadow* style props", "issue": "Deprecated 'shadow*' style props detected in styles (see console warnings on every screen). Should migrate to boxShadow per React Native 0.76+. Search /app/frontend/src for shadowColor/shadowOffset/shadowOpacity/shadowRadius."},
+      {"component": "pointerEvents prop", "issue": "Deprecated `props.pointerEvents` used somewhere (likely a View); should be `style={{ pointerEvents: '...' }}`. Console warning fires after signup."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_odontocert.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Migrate deprecated `shadow*` style props to `boxShadow` in the shared UI components (Card/Button/etc under /app/frontend/src/components) to silence RN warnings.",
+    "OPTIONAL: Replace `pointerEvents='...'` prop with `style={{ pointerEvents: '...' }}` wherever used.",
+    "OPTIONAL: Consider returning 401 (not 403) when Authorization header is missing on protected endpoints (FastAPI HTTPBearer default is 403)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 393 lines - manageable but at threshold; consider splitting into routers/{auth,profile,clients,materials,declarations,dashboard}.py when expanding.",
+    "Declarations list endpoint returns raw dicts without a response_model - fine, but adding a Pydantic model would formalize the API surface.",
+    "Dashboard `this_month` computed in Python by iterating all declarations - fine for MVP, would recommend MongoDB $match on issue_date prefix at scale."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_odontocert.py (new)",
+    "/app/test_reports/pytest/pytest_results.xml (generated)",
+    "/app/test_reports/iteration_1.json (this report)"
+  ],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% of critical flows verified"},
+  "seed_data_creation": "Tests create TEST_-prefixed users/clients/materials/declarations under fresh UUID emails per session (session-scoped fixture). Fresh signup users used for UI runs. Existing seed user tecnico@lab.it / password123 confirmed working with 2 existing declarations in archive.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend API is stable; use /app/backend/tests/test_odontocert.py as regression suite. Signature capture via react-native-signature-canvas is a WebView feature not testable on Expo web preview - test on native builds. When editing frontend, be mindful of the deprecated shadow*/pointerEvents warnings.",
+  "rca_of_issue": "N/A - no functional bugs found."
+}
