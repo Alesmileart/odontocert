@@ -1,0 +1,23 @@
+{
+  "summary": "Frontend-only regression on the reported iPhone Safari print bug (documento stampato solo sulla meta sinistra del foglio con intestazioni URL/data del browser sulla destra). Fix applicato in /app/frontend/src/utils/pdf.ts: exportDeclarationPdf/exportPrescriptionPdf ora fanno branching su Platform.OS === 'web' e chiamano Print.printAsync({ html }) invece di lasciare che venga stampata l'intera pagina dell'app. Aggiunto anche <meta name='viewport' content='width=794'> all'HTML e mantenuta la cornice '.sheet { border:1px solid #222; background:#fff }'. Login effettuato con tecnico@lab.it/password123, aperta prima dichiarazione (Cod. 0003/2026 - PROTESI PROVVISORIA - Livesu Anna). Testati entrambi i pulsanti di anteprima. Come indicato nel review request, il pulsante preview-share-button NON è stato cliccato (aprirebbe window.print bloccando il test); ne è stata verificata solo presenza/visibilità/abilitazione.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "pdf.ts (~410 lines) duplica ~40 righe di CSS (.sheet, table.teeth, .section-bar, .matlist) tra buildDeclarationHtml e buildPrescriptionHtml. Estrarre un BASE_CSS condiviso per mantenere coerenza in futuro.",
+    "PdfPreview.tsx inietta il viewport tramite html.replace('<head>', ...). Funziona (entrambi i builder emettono '<head>' verbatim) ma il viewport locale (width=800, maximum-scale=3) sovrascrive quello per la stampa (width=794) impostato nell'HTML sorgente. Su web, Print.printAsync({html}) usa l'HTML originale (con width=794) — l'iframe di anteprima ha invece width=800 per uso interattivo. Quindi comportamento corretto in stampa; solo osservazione stilistica."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a", "frontend": "100%" },
+  "seed_data_creation": "Nessuna — usati dati seedati esistenti (0003/2026, DC-2026-0002, DC-2026-0001) sotto tecnico@lab.it.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login: tecnico@lab.it / password123 via testIDs login-email-input / login-password-input / login-submit-button. Dalla Home tap sulla card 'PROTESI PROVVISORIA' (o qualsiasi Cod. XXXX/2026) per aprire /declaration/[id]. Footer con testID preview-declaration-button e preview-prescription-button apre il Modal PdfPreview con iframe (web). L'iframe usa srcDoc quindi content_frame() è affidabile solo dopo un piccolo wait_for_timeout(1000). NON cliccare preview-share-button su web: exportDeclarationPdf/exportPrescriptionPdf ora chiamano Print.printAsync({html}) su web, che sotto Expo Web apre window.print() (blocca la pagina fino a chiusura del dialog). Verificare invece solo presenza/visibilità del bottone. Contenuto iframe atteso: h1='Dichiarazione di conformità alle normative CE' o 'Prescrizione Odontoiatrica', .sheet con border 1px solid rgb(34,34,34), bg rgb(255,255,255), nessun elemento con [data-testid] (l'HTML del documento non ne contiene).",
+  "rca_of_issue": "BUG originale (Safari iPhone via web preview): quando l'utente premeva 'Esporta / Stampa PDF', su web il codice cadeva sul percorso printToFileAsync+Sharing.shareAsync che sotto Safari mobile falliva/regrediva alla stampa nativa della pagina intera dell'app, producendo un foglio con il documento a sinistra e area vuota a destra + intestazioni URL/data del browser. FIX (verificato in /app/frontend/src/utils/pdf.ts righe 270-287 e 393-409): branching esplicito su Platform.OS === 'web' che chiama await Print.printAsync({ html }) — expo-print su web crea un iframe isolato con solo l'HTML del documento e invoca window.print() su quel contenuto, cosicché la stampa contiene ESCLUSIVAMENTE il documento a piena pagina. L'HTML include '@page { size: A4 portrait; margin: 10mm }' + viewport width=794 (larghezza fisica A4 in px @96dpi) per garantire scala corretta. Verifica dinamica sul web preview: entrambe le anteprime renderizzano solo il documento (nessun elemento dell'app dentro l'iframe, hasAppEls=false, hasSheet=true, hasTeeth=true, bg bianco, cornice 1px #222). Su native (iOS/Android) il percorso printToFileAsync+Sharing.shareAsync produce PDF A4 pulito e resta invariato."
+}

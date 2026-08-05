@@ -1,5 +1,6 @@
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import { Platform } from "react-native";
 
 type Material = { name: string; manufacturer?: string; ce_number?: string; lot?: string; category?: string };
 type Conformity = { notes?: string };
@@ -135,6 +136,7 @@ export function buildDeclarationHtml(d: DeclarationData, lab: LabProfile): strin
 <html lang="it">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=794, initial-scale=1" />
 <style>
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
@@ -267,7 +269,11 @@ export function buildDeclarationHtml(d: DeclarationData, lab: LabProfile): strin
 
 export async function exportDeclarationPdf(d: DeclarationData, lab: LabProfile) {
   const html = buildDeclarationHtml(d, lab);
-  // A4 portrait (595 x 842 pt) — vertical layout
+  if (Platform.OS === "web") {
+    // Web: stampa SOLO il documento (non l'intera pagina dell'app)
+    await Print.printAsync({ html });
+    return;
+  }
   const { uri } = await Print.printToFileAsync({ html, base64: false, width: 595, height: 842 });
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
@@ -302,6 +308,7 @@ export function buildPrescriptionHtml(d: DeclarationData, lab: LabProfile): stri
 <html lang="it">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=794, initial-scale=1" />
 <style>
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
@@ -385,6 +392,10 @@ export function buildPrescriptionHtml(d: DeclarationData, lab: LabProfile): stri
 
 export async function exportPrescriptionPdf(d: DeclarationData, lab: LabProfile) {
   const html = buildPrescriptionHtml(d, lab);
+  if (Platform.OS === "web") {
+    await Print.printAsync({ html });
+    return;
+  }
   const { uri } = await Print.printToFileAsync({ html, base64: false, width: 595, height: 842 });
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
