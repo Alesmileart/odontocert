@@ -136,11 +136,11 @@ export function buildDeclarationHtml(d: DeclarationData, lab: LabProfile): strin
 <head>
 <meta charset="utf-8" />
 <style>
-  @page { size: A4 portrait; margin: 14mm 12mm; }
+  @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { background: #ffffff; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Georgia, serif; color: #111; font-size: 11px; line-height: 1.45; }
-  .sheet { border: none; background: #ffffff; padding: 0; }
+  .sheet { border: 1px solid #222; background: #ffffff; padding: 18px 22px; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
   .min { font-size: 12px; }
   .min .b { font-weight: bold; font-style: italic; }
@@ -303,11 +303,11 @@ export function buildPrescriptionHtml(d: DeclarationData, lab: LabProfile): stri
 <head>
 <meta charset="utf-8" />
 <style>
-  @page { size: A4 portrait; margin: 14mm 12mm; }
+  @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { background: #ffffff; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Georgia, serif; color: #111; font-size: 12px; line-height: 1.5; }
-  .sheet { border: none; background: #ffffff; padding: 0; }
+  .sheet { border: 1px solid #222; background: #ffffff; padding: 20px 24px; }
   h1 { text-align: center; font-size: 17px; margin: 4px 0 18px; }
   .grid { display: flex; gap: 16px; margin-bottom: 16px; }
   .box { flex: 1; border: 1px solid #333; border-radius: 4px; padding: 12px; }

@@ -1,0 +1,23 @@
+{
+  "summary": "Frontend-only regression on the follow-up PDF preview fix (Dichiarazione + Prescrizione) — user asked to REINTRODUCE a thin outer frame/border while KEEPING the white background for laser printing. Logged in with tecnico@lab.it / password123, opened first declaration (Cod. 0003/2026 - PROTESI PROVVISORIA - Livesu Anna), tapped preview-declaration-button and preview-prescription-button. Both anteprime now render with a visible thin dark 1px border (cornice) around the sheet AND a fully WHITE background (no grey / no screenshot look). Header 'Dichiarazione di conformità alle normative CE' / 'Prescrizione Odontoiatrica', teeth grid with ✕ marks on selected teeth (31, 41), all sections (Protocollo, Materiali, Etichetta for declaration; Studio, Laboratorio, Elementi dentali, Dispositivo richiesto, Materiali for prescription) render correctly INSIDE the frame. preview-close (X) closes the modal in both flows. preview-share-button is present and tapping it does NOT cause a red screen / crash on web (native sharing may not fire in web preview — expected). BUG FIX CONFIRMED visually.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "pdf.ts (~400 lines): the two HTML builders duplicate ~40 lines of CSS (.sheet, table.teeth, .section-bar, .matlist). Consider extracting a shared BASE_CSS constant so future frame/background changes stay in sync between Dichiarazione and Prescrizione.",
+    "PdfPreview.tsx still uses html.replace('<head>', ...) to inject the viewport meta — safe today (both builders emit '<head>' verbatim) but a defensive fallback would help if templates change."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a", "frontend": "100%" },
+  "seed_data_creation": "None — used existing seeded declarations (0003/2026, DC-2026-0002, DC-2026-0001) under tecnico@lab.it.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login: tecnico@lab.it / password123 via testIDs login-email-input / login-password-input / login-submit-button. From Home tap the 'PROTESI PROVVISORIA' card (or any Cod. XXXX/2026 card) to open /declaration/[id]. Footer has 'Dichiarazione' (testID preview-declaration-button) and 'Prescrizione' (testID preview-prescription-button); each opens a full-screen Modal with an iframe (web) / WebView (native). Current CSS (in /app/frontend/src/utils/pdf.ts): both builders have '.sheet { border: 1px solid #222; background: #ffffff; padding: 18-24px }' and 'html,body { background: #ffffff }' plus '@page A4 portrait; margin: 10mm'. Do NOT remove the border again — the user explicitly asked for a thin outer frame while keeping laser-printer-friendly white background. Note: on web the share button (preview-share-button) may be a no-op because expo-sharing is not available in browser — do not treat that as a bug. Note on tests: reading iframe DOM via content_frame().evaluate() on srcDoc iframes can race with load — rely on screenshots as ground truth or wait for iframe.contentDocument.readyState==='complete' before querying.",
+  "rca_of_issue": "Two-step story. (1) Original bug (fixed in iteration 1): '.sheet' had a border and preview surface was grey → looked like a screenshot on a coloured page. (2) Iteration 2 removed the border entirely and forced white — but user reported the document became 'troppo esteso' (too edge-to-edge). Current fix (iteration 3): restored a thin 1px #222 outer border on .sheet in both buildDeclarationHtml and buildPrescriptionHtml with padding 18-24px, while keeping html/body/.sheet background #ffffff and @page A4 portrait margin 10mm. Iframe (web) and WebView (native) inside PdfPreview both still set backgroundColor #FFFFFF. Verified visually: both anteprime now have a clean framed A4-like layout on pure white — safe for laser print and matches the user's reference photo."
+}
