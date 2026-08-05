@@ -30,14 +30,14 @@
 - [x] Auto codice lavoro NNNN/YYYY, draft vs issued.
 - [x] Signature capture + PDF share (dichiarazione e prescrizione).
 - [x] Dashboard stats + recent, Archive search/filter chips.
+- [x] Logo laboratorio: upload dalla galleria (expo-image-picker, con permessi) salvato come data URI e stampato nell'intestazione di dichiarazione e prescrizione.
+- [x] Selettore data a calendario (tap) per data prescrizione e data consegna.
 
 ## Architettura backend condiviso (predisposizione)
 - Backend unico FastAPI + MongoDB con API REST per user/profile/clients/materials/declarations, riutilizzabili da futuri frontend (web magazzino, fatturazione).
 - Dati anagrafica cliente e materiali centralizzati e già richiamati dalla dichiarazione → pronti per moduli magazzino/fatturazione.
 
 ## Backlog (prioritized)
-- P1: Logo laboratorio upload (già supportato nel PDF, manca UI upload).
-- P1: Date picker per prescrizione/consegna.
 - P2: Modulo magazzino (giacenze materiali + scarico automatico da dichiarazione) sullo stesso backend.
 - P2: Modulo fatturazione elettronica (integrazione SDI via provider accreditato).
 - P2: Toggle Direttiva 93/42/CEE vs Regolamento UE 2017/745 (MDR).

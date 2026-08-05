@@ -9,6 +9,7 @@ import { Field } from "@/src/components/Field";
 import { FormSheet } from "@/src/components/FormSheet";
 import { SignaturePad, SignaturePadRef } from "@/src/components/SignaturePad";
 import { ToothChart } from "@/src/components/ToothChart";
+import { DateField } from "@/src/components/DateField";
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/components/Toast";
 import { colors, fontSize, spacing, radius } from "@/src/theme";
@@ -242,7 +243,7 @@ export default function NewDeclaration() {
                 Prescrizione
               </AppText>
               <Field label="Codice prescrizione" value={prescriptionCode} onChangeText={setPrescriptionCode} placeholder="Es. 13LIO2AN23" mono autoCapitalize="characters" testID="decl-prescription-code" />
-              <Field label="Data prescrizione" value={prescriptionDate} onChangeText={setPrescriptionDate} placeholder="GG/MM/AAAA" testID="decl-prescription-date" />
+              <DateField label="Data prescrizione" value={prescriptionDate} onChange={setPrescriptionDate} testID="decl-prescription-date" />
               <Field label="Prescrivente (odontoiatra)" value={prescriber} onChangeText={setPrescriber} placeholder="Es. Dott. Bianchi" testID="decl-prescriber" />
 
               {clients.length > 0 && (
@@ -334,7 +335,7 @@ export default function NewDeclaration() {
               <AppText variant="bold" size={fontSize.xl} style={styles.stepTitle}>
                 Etichetta e note
               </AppText>
-              <Field label="Data di consegna" value={deliveryDate} onChangeText={setDeliveryDate} placeholder="GG/MM/AAAA (default: oggi)" testID="decl-delivery-date" />
+              <DateField label="Data di consegna" value={deliveryDate} onChange={setDeliveryDate} placeholder="GG/MM/AAAA (default: oggi)" testID="decl-delivery-date" />
               <Field label="Termini per l'utilizzo (giorni)" value={usageDays} onChangeText={setUsageDays} placeholder="30" keyboardType="number-pad" testID="decl-usage-days" />
 
               <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.miniLabel}>

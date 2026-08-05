@@ -1,9 +1,11 @@
 import React, { useCallback, useState } from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet, Pressable, Linking } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { AppText, Button, Card, Divider } from "@/src/components/ui";
 import { Field } from "@/src/components/Field";
 import { api } from "@/src/api/client";
@@ -75,6 +77,29 @@ export default function ProfileScreen() {
 
   const up = (k: keyof Profile) => (t: string) => setProfile((p) => ({ ...p, [k]: t }));
 
+  const [permBlocked, setPermBlocked] = useState(false);
+
+  const pickLogo = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      setPermBlocked(!perm.canAskAgain);
+      toast.show("Permesso galleria negato", "error");
+      return;
+    }
+    setPermBlocked(false);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.5,
+      base64: true,
+      allowsEditing: true,
+    });
+    if (result.canceled || !result.assets?.[0]?.base64) return;
+    const asset = result.assets[0];
+    const mime = asset.mimeType || "image/jpeg";
+    setProfile((p) => ({ ...p, logo_base64: `data:${mime};base64,${asset.base64}` }));
+    toast.show("Logo aggiornato — ricorda di salvare", "info");
+  };
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
@@ -111,6 +136,43 @@ export default function ProfileScreen() {
         <AppText size={fontSize.sm} color={colors.muted} style={styles.sectionHint}>
           Questi dati vengono inseriti automaticamente in ogni dichiarazione.
         </AppText>
+
+        <AppText variant="medium" size={fontSize.sm} color={colors.onSurfaceSecondary} style={styles.logoLabel}>
+          Logo del laboratorio
+        </AppText>
+        <View style={styles.logoRow}>
+          <View style={styles.logoBox}>
+            {profile.logo_base64 ? (
+              <Image source={{ uri: profile.logo_base64 }} style={styles.logoImg} contentFit="contain" />
+            ) : (
+              <Ionicons name="image-outline" size={28} color={colors.muted} />
+            )}
+          </View>
+          <View style={{ flex: 1, gap: spacing.sm }}>
+            <Button
+              title={profile.logo_base64 ? "Cambia logo" : "Carica logo"}
+              kind="secondary"
+              onPress={pickLogo}
+              icon={<Ionicons name="cloud-upload-outline" size={18} color={colors.brandPrimary} />}
+              testID="pick-logo-button"
+            />
+            {profile.logo_base64 ? (
+              <Pressable onPress={() => setProfile((p) => ({ ...p, logo_base64: "" }))} testID="remove-logo-button">
+                <AppText variant="semibold" size={fontSize.base} color={colors.error} style={{ textAlign: "center" }}>
+                  Rimuovi logo
+                </AppText>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+        {permBlocked ? (
+          <Pressable style={styles.settingsBtn} onPress={() => Linking.openSettings()} testID="open-settings-button">
+            <Ionicons name="settings-outline" size={16} color={colors.brandPrimary} />
+            <AppText variant="semibold" size={fontSize.sm} color={colors.brandPrimary}>
+              Apri impostazioni per abilitare la galleria
+            </AppText>
+          </Pressable>
+        ) : null}
 
         <Field label="Nome laboratorio" value={profile.lab_name} onChangeText={up("lab_name")} placeholder="Laboratorio Odontotecnico Rossi" testID="lab-name-input" />
         <Field label="Dicitura autorizzazione" value={profile.authorized_label} onChangeText={up("authorized_label")} placeholder="Laboratorio Odontotecnico Autorizzato" testID="lab-authorized-input" />
@@ -159,5 +221,20 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { marginBottom: spacing.xs },
   sectionHint: { marginBottom: spacing.lg },
+  logoLabel: { marginBottom: spacing.sm },
+  logoRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg, marginBottom: spacing.md },
+  logoBox: {
+    width: 84,
+    height: 84,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceTertiary,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  logoImg: { width: "100%", height: "100%" },
+  settingsBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs, marginBottom: spacing.lg },
   logout: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, paddingVertical: spacing.md },
 });

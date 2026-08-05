@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.odontodeclarations.zvgj9y"
+      "bundleIdentifier": "com.emergent.odontodeclarations.zvgj9y",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Carica il logo del laboratorio dalle foto"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +21,8 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.emergent.odontodeclarations.zvgj9y"
+      "package": "com.emergent.odontodeclarations.zvgj9y",
+      "permissions": ["READ_MEDIA_IMAGES"]
     },
     "web": {
       "bundler": "metro",
@@ -27,6 +31,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Carica il logo del laboratorio dalle foto"
+        }
+      ],
       [
         "expo-splash-screen",
         {
