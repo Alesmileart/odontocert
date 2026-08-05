@@ -407,3 +407,165 @@ export async function exportPrescriptionPdf(d: DeclarationData, lab: LabProfile)
   }
   return uri;
 }
+
+/* =========================================================================
+ * FASCICOLO DEI PROTOCOLLI DI FABBRICAZIONE
+ * Protocolli suddivisi per tipologia di lavorazione, da tenere in archivio
+ * e stampare (fascicolo completo o singolo protocollo) su richiesta.
+ * ========================================================================= */
+export type ProtocolItem = { id?: string; title: string; body: string; order?: number };
+
+function escapeHtml(s: string) {
+  return (s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function protocolBodyHtml(body: string) {
+  // Converte righe di testo in paragrafi; righe che iniziano con "-" o "•" in elenco.
+  const lines = (body || "").split(/\r?\n/);
+  let html = "";
+  let inList = false;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) {
+      if (inList) { html += "</ul>"; inList = false; }
+      continue;
+    }
+    if (/^[-•]/.test(line)) {
+      if (!inList) { html += "<ul>"; inList = true; }
+      html += `<li>${escapeHtml(line.replace(/^[-•]\s*/, ""))}</li>`;
+    } else {
+      if (inList) { html += "</ul>"; inList = false; }
+      html += `<p>${escapeHtml(line)}</p>`;
+    }
+  }
+  if (inList) html += "</ul>";
+  return html || `<p class="muted">—</p>`;
+}
+
+function fascicoloStyles() {
+  return `
+  @page { size: A4 portrait; margin: 12mm; }
+  * { box-sizing: border-box; }
+  html, body { background: #ffffff; margin: 0; padding: 0; }
+  body { font-family: 'Times New Roman', Georgia, serif; color: #111; font-size: 12px; line-height: 1.5; }
+  .doc-head { border-bottom: 3px solid #2D4A3E; padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .doc-head .lab { font-weight: bold; font-style: italic; color: #1a5b34; font-size: 14px; }
+  .doc-head .sub { font-size: 10px; color: #555; }
+  h1 { text-align: center; font-size: 18px; margin: 10px 0 4px; }
+  .cover-sub { text-align: center; color: #555; margin-bottom: 20px; font-size: 12px; }
+  .toc { border: 1px solid #ccc; border-radius: 6px; padding: 12px 16px; margin-bottom: 8px; }
+  .toc h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; color: #2D4A3E; }
+  .toc li { margin-bottom: 4px; }
+  .proto { page-break-inside: avoid; margin-bottom: 22px; }
+  .proto-title { background: #2D4A3E; color: #fff; padding: 6px 10px; border-radius: 4px 4px 0 0; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; font-size: 12px; }
+  .proto-body { border: 1px solid #2D4A3E; border-top: none; padding: 10px 14px; border-radius: 0 0 4px 4px; text-align: justify; }
+  .proto-body p { margin: 0 0 6px; }
+  .proto-body ul { margin: 4px 0 8px 18px; padding: 0; }
+  .proto-body li { margin-bottom: 3px; }
+  .muted { color: #888; }
+  .foot { margin-top: 26px; font-size: 10px; color: #555; border-top: 1px solid #ccc; padding-top: 6px; }
+  .break { page-break-before: always; }`;
+}
+
+function labHeadHtml(lab: LabProfile) {
+  const logo = lab.logo_base64 ? `<img src="${lab.logo_base64}" style="max-height:46px" />` : "";
+  return `
+  <div class="doc-head">
+    <div>
+      <div class="lab">${lab.lab_name || "Laboratorio Odontotecnico"}</div>
+      <div class="sub">${lab.address || ""} ${lab.city ? "· " + lab.city : ""}</div>
+      <div class="sub">${lab.registration_number ? "Reg. Min. Salute: " + lab.registration_number : ""}</div>
+    </div>
+    <div>${logo}</div>
+  </div>`;
+}
+
+export function buildProtocolsFascicoloHtml(protocols: ProtocolItem[], lab: LabProfile): string {
+  const today = new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
+  const toc = protocols
+    .map((p, i) => `<li>${i + 1}. ${escapeHtml(p.title)}</li>`)
+    .join("");
+  const sections = protocols
+    .map(
+      (p, i) => `
+    <div class="proto ${i > 0 ? "" : ""}">
+      <div class="proto-title">${i + 1}. ${escapeHtml(p.title)}</div>
+      <div class="proto-body">${protocolBodyHtml(p.body)}</div>
+    </div>`
+    )
+    .join("");
+
+  return `
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=794, initial-scale=1" />
+<style>${fascicoloStyles()}</style>
+</head>
+<body>
+  ${labHeadHtml(lab)}
+  <h1>Fascicolo dei Protocolli di Fabbricazione</h1>
+  <div class="cover-sub">Protocolli generali suddivisi per tipologia di lavorazione — documento di archivio (Rev. ${today})</div>
+  <div class="toc">
+    <h3>Indice</h3>
+    <ol style="margin:0; padding-left:18px">${toc || '<li class="muted">Nessun protocollo</li>'}</ol>
+  </div>
+  ${sections}
+  <div class="foot">Documento conservato presso il laboratorio ${lab.lab_name || ""} e stampabile su richiesta. Data di emissione: ${today}.</div>
+</body>
+</html>`;
+}
+
+export function buildSingleProtocolHtml(protocol: ProtocolItem, lab: LabProfile): string {
+  const today = new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
+  return `
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=794, initial-scale=1" />
+<style>${fascicoloStyles()}</style>
+</head>
+<body>
+  ${labHeadHtml(lab)}
+  <h1>Protocollo di Fabbricazione</h1>
+  <div class="cover-sub">Tipologia di lavorazione</div>
+  <div class="proto">
+    <div class="proto-title">${escapeHtml(protocol.title)}</div>
+    <div class="proto-body">${protocolBodyHtml(protocol.body)}</div>
+  </div>
+  <div class="foot">Estratto dal Fascicolo dei Protocolli di Fabbricazione — ${lab.lab_name || ""}. Data: ${today}.</div>
+</body>
+</html>`;
+}
+
+export async function exportProtocolsFascicoloPdf(protocols: ProtocolItem[], lab: LabProfile) {
+  const html = buildProtocolsFascicoloHtml(protocols, lab);
+  if (Platform.OS === "web") {
+    await Print.printAsync({ html });
+    return;
+  }
+  const { uri } = await Print.printToFileAsync({ html, base64: false, width: 595, height: 842 });
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Condividi fascicolo protocolli", UTI: "com.adobe.pdf" });
+  }
+  return uri;
+}
+
+export async function exportSingleProtocolPdf(protocol: ProtocolItem, lab: LabProfile) {
+  const html = buildSingleProtocolHtml(protocol, lab);
+  if (Platform.OS === "web") {
+    await Print.printAsync({ html });
+    return;
+  }
+  const { uri } = await Print.printToFileAsync({ html, base64: false, width: 595, height: 842 });
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Condividi protocollo", UTI: "com.adobe.pdf" });
+  }
+  return uri;
+}
+

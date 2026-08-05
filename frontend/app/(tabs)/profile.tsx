@@ -2,7 +2,7 @@ import React, { useCallback, useState } from "react";
 import { View, StyleSheet, Pressable, Linking } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
@@ -45,6 +45,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const toast = useToast();
+  const router = useRouter();
   const [profile, setProfile] = useState<Profile>(empty);
   const [saving, setSaving] = useState(false);
 
@@ -129,6 +130,21 @@ export default function ProfileScreen() {
             </AppText>
           </View>
         </Card>
+
+        <Pressable style={styles.navRow} onPress={() => router.push("/fascicolo")} testID="open-fascicolo">
+          <View style={styles.navIcon}>
+            <Ionicons name="folder-open-outline" size={20} color={colors.brandPrimary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppText variant="semibold" size={fontSize.base}>
+              Fascicolo protocolli di fabbricazione
+            </AppText>
+            <AppText size={fontSize.sm} color={colors.muted}>
+              Protocolli per tipologia · archivio e stampa
+            </AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+        </Pressable>
 
         <AppText variant="bold" size={fontSize.lg} style={styles.sectionTitle}>
           Dati del laboratorio
@@ -220,6 +236,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   sectionTitle: { marginBottom: spacing.xs },
+  navRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  navIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.brandSecondary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   sectionHint: { marginBottom: spacing.lg },
   logoLabel: { marginBottom: spacing.sm },
   logoRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg, marginBottom: spacing.md },

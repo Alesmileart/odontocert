@@ -316,6 +316,49 @@ async def delete_material(material_id: str, user: dict = Depends(get_current_use
     return {"ok": True}
 
 
+# ----------------------- Protocols (Fascicolo di fabbricazione) -----------------------
+class Protocol(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    body: str = ""
+    order: int = 0
+
+
+class ProtocolInput(BaseModel):
+    title: str
+    body: str = ""
+    order: int = 0
+
+
+@api_router.get("/protocols", response_model=List[Protocol])
+async def list_protocols(user: dict = Depends(get_current_user)):
+    docs = await db.protocols.find({"user_id": user["id"]}).sort([("order", 1), ("title", 1)]).to_list(1000)
+    return [Protocol(**{k: d.get(k) for k in Protocol.model_fields.keys()}) for d in docs]
+
+
+@api_router.post("/protocols", response_model=Protocol, status_code=201)
+async def create_protocol(data: ProtocolInput, user: dict = Depends(get_current_user)):
+    obj = Protocol(**data.dict())
+    await db.protocols.insert_one({**obj.dict(), "user_id": user["id"], "created_at": now_iso()})
+    return obj
+
+
+@api_router.put("/protocols/{protocol_id}", response_model=Protocol)
+async def update_protocol(protocol_id: str, data: ProtocolInput, user: dict = Depends(get_current_user)):
+    doc = await db.protocols.find_one({"id": protocol_id, "user_id": user["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Protocollo non trovato")
+    await db.protocols.update_one({"id": protocol_id, "user_id": user["id"]}, {"$set": data.dict()})
+    return Protocol(id=protocol_id, **data.dict())
+
+
+@api_router.delete("/protocols/{protocol_id}")
+async def delete_protocol(protocol_id: str, user: dict = Depends(get_current_user)):
+    await db.protocols.delete_one({"id": protocol_id, "user_id": user["id"]})
+    return {"ok": True}
+
+
+
 # ----------------------- Declarations routes -----------------------
 async def next_declaration_number(user_id: str) -> str:
     year = datetime.now(timezone.utc).year
