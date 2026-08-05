@@ -1,0 +1,155 @@
+{
+  "app_name": "OdontoCert",
+  "personality": "1 iOS-Native Clean",
+  "personality_one_liner": "A precise, trustworthy, and clinical mobile workspace that frames complex medical compliance data with absolute clarity and calm.",
+  "color": {
+    "surface": "#FCFDFD",
+    "onSurface": "#111412",
+    "surfaceSecondary": "#FFFFFF",
+    "onSurfaceSecondary": "#3A423D",
+    "surfaceTertiary": "#F0F3F1",
+    "onSurfaceTertiary": "#2D332F",
+    "surfaceInverse": "#111412",
+    "onSurfaceInverse": "#FFFFFF",
+    "brand": "#2D4A3E",
+    "brandPrimary": "#2D4A3E",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#E9EFEA",
+    "onBrandSecondary": "#2D4A3E",
+    "brandTertiary": "#F3F7F4",
+    "onBrandTertiary": "#2D4A3E",
+    "success": "#246B44",
+    "onSuccess": "#FFFFFF",
+    "warning": "#9C6A14",
+    "onWarning": "#FFFFFF",
+    "error": "#A63535",
+    "onError": "#FFFFFF",
+    "info": "#425C54",
+    "onInfo": "#FFFFFF",
+    "border": "#E3E8E5",
+    "borderStrong": "#C4CCC7",
+    "divider": "#EBF0EC"
+  },
+  "typography": {
+    "displayFontFamily": "Plus Jakarta Sans",
+    "textFontFamily": "Plus Jakarta Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Handle spacing correctly dont have extra spaces where its not required, handle padding and margin corectly and subtle for buttons and components",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": "true",
+    "do's": [
+      "Use for bottom tab bar when content scrolls behind",
+      "Use for sticky headers in the multi-step form over scrolling content",
+      "Use for bottom sheet handles and modal scrims"
+    ],
+    "dont's": [
+      "Never apply to form inputs or list rows",
+      "Do not use on dense data screens where contrast is key",
+      "Do not use over the signature pad"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Dashboard (Home)",
+      "purpose": "Provide quick insights into recent declarations and immediate access to create a new one.",
+      "states": {
+        "loading": "Centered spinner on surface",
+        "empty": "Illustration of a clean clipboard with 'No recent declarations. Create your first MDR compliance document.' and a primary CTA.",
+        "error": "Readable error message stating 'Unable to load dashboard' with Retry button."
+      },
+      "layout": "Header with Lab name and profile avatar. A featured glass-morphism hero card (brand background with macro prosthetic image) showing 'Declarations this month'. Below, a section titled 'Recent' with a vertical list of cards (Patient Ref, Date, Status Badge). Sticky FAB or fixed bottom CTA in tab for 'New Declaration'."
+    },
+    {
+      "name": "New Declaration (Multi-Step Form)",
+      "purpose": "A step-by-step wizard to collect MDR compliance data without overwhelming the technician.",
+      "states": {
+        "loading": "Spinner while verifying lot numbers or saving draft",
+        "empty": "N/A for form entry",
+        "error": "Inline validation in red below the specific input fields, summary toast on failed submission."
+      },
+      "layout": "Stack screen (hides bottom tabs). Sticky header with glass blur and horizontal progress bar. Single-column inputs. Steps: 1) Client/Dentist Select, 2) Patient Ref & Device Type, 3) Materials & Lot Numbers (use Space Mono for lot numbers), 4) Legal Conformity toggles, 5) Signature Pad. 'Next' button pinned sticky above the keyboard/bottom safe area."
+    },
+    {
+      "name": "Archive",
+      "purpose": "Searchable, filterable list of all issued declarations.",
+      "states": {
+        "loading": "Skeleton list of 5 cards.",
+        "empty": "Empty clipboard image with 'No declarations found' matching the active filters.",
+        "error": "Error message with Retry."
+      },
+      "layout": "Sticky header with search bar and horizontally scrolling filter chips (Status, Date, Dentist). Flat list of surfaceSecondary cards with subtle md radius and 1px border. Card contains Patient Ref, Dentist Name, Date, and PDF download icon button."
+    },
+    {
+      "name": "Library (Clients & Materials)",
+      "purpose": "Manage reusable master data to speed up form filling.",
+      "states": {
+        "loading": "Skeleton list.",
+        "empty": "Empty desk illustration with 'Add your first dentist or material.'",
+        "error": "Error toast."
+      },
+      "layout": "Top segmented control (Clients | Materials). List items with trailing chevron. FAB to add new."
+    }
+  ],
+  "images": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1590424693420-634a0b0b782c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwyfHxkZW50YWwlMjBsYWJvcmF0b3J5JTIwbWFjcm8lMjBwcm9zdGhldGljfGVufDB8fHx8MTc4NTkyMjE3NXww&ixlib=rb-4.1.0&q=85",
+      "alt": "Macro shot of a dental laboratory technician working on a prosthetic"
+    },
+    "empty_archive": {
+      "url": "https://images.unsplash.com/photo-1651760680066-db9d32bd0357?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwxfHxlbXB0eSUyMGNsaXBib2FyZCUyMGNsZWFuJTIwbWluaW1hbHxlbnwwfHx8fDE3ODU5MjIxNzV8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "A clean white clipboard hanging on a wall"
+    },
+    "empty_library": {
+      "url": "https://images.unsplash.com/photo-1568847811512-803314424fdc?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwyfHxlbXB0eSUyMGNsaXBib2FyZCUyMGNsZWFuJTIwbWluaW1hbHxlbnwwfHx8fDE3ODU5MjIxNzV8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "Empty clipboard on a clean desk with a small flower"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly adhere to the '1 iOS-Native Clean' personality. The UI must feel professional, clinical, and precise, avoiding any unnecessary decoration.",
+    "Use 'Plus Jakarta Sans' as the core display/text font. However, for highly technical alphanumeric data (Lot numbers, CE certificate codes, VAT numbers), explicitly use a monospace font like 'Space Mono' or 'JetBrains Mono' to prevent reading errors.",
+    "BANNED COLORS: Do not use any shades of blue, indigo, violet, navy, or purple. The primary brand color is Deep Sage Green (#2D4A3E), paired with charcoal grey and bone white surfaces.",
+    "Form UX (Critical): The MDR compliance form must be a multi-step flow using a Stack screen (not a single endlessly scrolling page). Include a persistent horizontal progress bar in the header. Break sections down logically: 1. Context, 2. Prosthetic Details, 3. Materials, 4. Sign-off.",
+    "Ensure 'Continue'/'Save' buttons in the forms are pinned to the bottom of the screen inside a KeyboardAvoidingView with safe-area padding. They should be prominent (44pt+ height).",
+    "For the signature step, use a robust signature canvas library (e.g., react-native-signature-canvas). Contain it inside a clear bounded card with a subtle border and provide a 'Clear' text button underneath.",
+    "For background image overlays (like the hero card on the Dashboard), mandate a top-to-bottom linear gradient scrim (transparent to >70% surfaceInverse) to ensure text contrast.",
+    "Design the PDF preview screen clearly - it should render the generated document cleanly, with immediate 'Export' or 'Share' actions using Expo Sharing.",
+    "All form inputs must have labels positioned *above* the input fields (never floating or inside), with a single-column layout for maximum legibility."
+  ]
+}
