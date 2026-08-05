@@ -138,46 +138,46 @@ export function buildDeclarationHtml(d: DeclarationData, lab: LabProfile): strin
 <meta charset="utf-8" />
 <meta name="viewport" content="width=794, initial-scale=1" />
 <style>
-  @page { size: A4 portrait; margin: 10mm; }
+  @page { size: A4 portrait; margin: 8mm; }
   * { box-sizing: border-box; }
   html, body { background: #ffffff; margin: 0; padding: 0; }
-  body { font-family: 'Times New Roman', Georgia, serif; color: #111; font-size: 11px; line-height: 1.45; }
-  .sheet { border: 1px solid #222; background: #ffffff; padding: 18px 22px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
-  .min { font-size: 12px; }
+  body { font-family: 'Times New Roman', Georgia, serif; color: #111; font-size: 9.5px; line-height: 1.28; }
+  .sheet { border: 1px solid #222; background: #ffffff; padding: 10px 14px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; }
+  .min { font-size: 10px; }
   .min .b { font-weight: bold; font-style: italic; }
-  .min .s { font-style: italic; font-size: 10px; }
-  .lab-logo { max-height: 54px; }
-  .lab-logo-text { font-weight: bold; font-style: italic; color: #1a5b34; font-size: 14px; text-align: right; }
-  h1 { text-align: center; font-size: 15px; margin: 18px 0 14px; }
+  .min .s { font-style: italic; font-size: 8.5px; }
+  .lab-logo { max-height: 42px; }
+  .lab-logo-text { font-weight: bold; font-style: italic; color: #1a5b34; font-size: 12px; text-align: right; }
+  h1 { text-align: center; font-size: 13px; margin: 6px 0 5px; }
   .center { text-align: center; }
-  .fab { text-align: center; font-weight: bold; margin: 6px 0; line-height: 1.5; }
-  .fab .name { font-size: 12px; }
-  .attesta { text-align: center; margin: 10px 0; }
-  .legal { text-align: justify; font-weight: bold; margin: 8px 0 14px; }
-  .kv { margin: 4px 0; }
+  .fab { text-align: center; font-weight: bold; margin: 3px 0; line-height: 1.3; }
+  .fab .name { font-size: 11px; }
+  .attesta { text-align: center; margin: 4px 0; }
+  .legal { text-align: justify; font-weight: bold; margin: 4px 0 6px; }
+  .kv { margin: 2px 0; }
   .kv b { display: inline-block; min-width: 130px; }
   .strong { font-weight: bold; }
-  table.teeth { border-collapse: collapse; margin: 14px auto; }
+  table.teeth { border-collapse: collapse; margin: 6px auto; }
   table.teeth td { text-align: center; }
-  table.teeth td.tnum { width: 24px; height: 14px; font-size: 9px; color: #111; border: none; padding: 1px 0; }
-  table.teeth td.tbox { width: 24px; height: 22px; border: 1px solid #111; font-size: 13px; font-weight: bold; line-height: 20px; }
-  table.teeth td.tspace { width: 12px; border: none; }
-  .section-bar { background: #eee; border-top: 1px solid #333; border-bottom: 1px solid #333; text-align: center; font-weight: bold; padding: 3px; margin-top: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .section-body { text-align: justify; padding: 6px 2px; }
-  .matlist { margin-top: 4px; }
-  .matchip { display: inline-block; border: 1px solid #999; border-radius: 3px; padding: 1px 6px; margin: 2px 3px 2px 0; font-size: 10px; }
-  .sign-area { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 26px; }
-  .sig { width: 200px; height: 60px; object-fit: contain; }
-  .sig-label { border-top: 1px solid #111; text-align: center; padding-top: 3px; width: 220px; font-style: italic; }
-  .cut { border-top: 2px dashed #666; margin: 22px 0 8px; position: relative; text-align: left; }
-  .cut span { position: absolute; top: -9px; left: 0; background: #fff; padding-right: 6px; }
-  .label-title { text-align: center; font-weight: bold; background: #eee; border: 1px solid #333; padding: 3px; text-transform: uppercase; }
+  table.teeth td.tnum { width: 22px; height: 11px; font-size: 8px; color: #111; border: none; padding: 0; }
+  table.teeth td.tbox { width: 22px; height: 17px; border: 1px solid #111; font-size: 11px; font-weight: bold; line-height: 15px; }
+  table.teeth td.tspace { width: 10px; border: none; }
+  .section-bar { background: #eee; border-top: 1px solid #333; border-bottom: 1px solid #333; text-align: center; font-weight: bold; padding: 2px; margin-top: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .section-body { text-align: justify; padding: 3px 2px; }
+  .matlist { margin-top: 3px; }
+  .matchip { display: inline-block; border: 1px solid #999; border-radius: 3px; padding: 1px 5px; margin: 2px 3px 2px 0; font-size: 9px; }
+  .sign-area { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px; }
+  .sig { width: 180px; height: 46px; object-fit: contain; }
+  .sig-label { border-top: 1px solid #111; text-align: center; padding-top: 2px; width: 200px; font-style: italic; }
+  .cut { border-top: 2px dashed #666; margin: 10px 0 5px; position: relative; text-align: left; }
+  .cut span { position: absolute; top: -8px; left: 0; background: #fff; padding-right: 6px; }
+  .label-title { text-align: center; font-weight: bold; background: #eee; border: 1px solid #333; padding: 2px; text-transform: uppercase; }
   .label-grid { display: flex; border: 1px solid #333; border-top: none; }
-  .label-col { flex: 1; padding: 10px 12px; }
+  .label-col { flex: 1; padding: 6px 10px; }
   .label-col.left { border-right: 1px solid #333; }
-  .label-col h4 { margin: 0 0 4px; font-size: 11px; }
-  .small { font-size: 9px; color: #333; }
+  .label-col h4 { margin: 0 0 3px; font-size: 10px; }
+  .small { font-size: 8px; color: #333; }
 </style>
 </head>
 <body>
