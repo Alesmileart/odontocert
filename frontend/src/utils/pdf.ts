@@ -68,9 +68,16 @@ function fmtDate(iso?: string) {
 }
 
 function toothCells(row: number[], selected: Set<number>, numbersOnTop: boolean) {
-  const numbers = row.map((t) => `<td class="tnum">${t}</td>`).join("");
+  const numbers = row
+    .map((t, i) => `${i === 8 ? '<td class="tspace"></td>' : ""}<td class="tnum">${t}</td>`)
+    .join("");
   const boxes = row
-    .map((t) => `<td class="tbox">${selected.has(t) ? "&#9746;" : "&#9744;"}</td>`)
+    .map(
+      (t, i) =>
+        `${i === 8 ? '<td class="tspace"></td>' : ""}<td class="tbox">${
+          selected.has(t) ? "&#10005;" : "&nbsp;"
+        }</td>`
+    )
     .join("");
   return numbersOnTop
     ? `<tr>${numbers}</tr><tr>${boxes}</tr>`
@@ -140,10 +147,11 @@ export function buildDeclarationHtml(d: DeclarationData, lab: LabProfile): strin
   .kv { margin: 4px 0; }
   .kv b { display: inline-block; min-width: 130px; }
   .strong { font-weight: bold; }
-  table.teeth { border-collapse: collapse; margin: 12px auto; }
-  table.teeth td { width: 20px; height: 18px; text-align: center; font-size: 9px; }
-  table.teeth td.tbox { border: none; font-size: 15px; line-height: 1; }
-  table.teeth td.tnum { color: #333; }
+  table.teeth { border-collapse: collapse; margin: 14px auto; }
+  table.teeth td { text-align: center; }
+  table.teeth td.tnum { width: 24px; height: 14px; font-size: 9px; color: #111; border: none; padding: 1px 0; }
+  table.teeth td.tbox { width: 24px; height: 22px; border: 1px solid #111; font-size: 13px; font-weight: bold; line-height: 20px; }
+  table.teeth td.tspace { width: 12px; border: none; }
   .section-bar { background: #eee; border-top: 1px solid #333; border-bottom: 1px solid #333; text-align: center; font-weight: bold; padding: 3px; margin-top: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
   .section-body { text-align: justify; padding: 6px 2px; }
   .matlist { margin-top: 4px; }
