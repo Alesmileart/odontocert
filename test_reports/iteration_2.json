@@ -1,0 +1,23 @@
+{
+  "summary": "Frontend-only regression on PDF preview bug fix (Declaration + Prescription). Login with tecnico@lab.it OK; opened first declaration (Cod. 0003/2026, PROTESI PROVVISORIA); tapped preview-declaration-button and preview-prescription-button; both anteprime rendered with WHITE background at full page, WITHOUT the external frame/box that previously made them look like 'a screenshot on a sheet'. Header 'Dichiarazione di conformita alle normative CE' / 'Prescrizione Odontoiatrica', teeth grid with X marks, and all sections render correctly. preview-close button closes the modal. preview-share-button is present and tapping it does NOT crash / red-screen on web (native sharing may not fire in web preview, as per request). Iframe element has inline backgroundColor #FFFFFF; the HTML sheet no longer has a border and background is #FFFFFF in both buildDeclarationHtml and buildPrescriptionHtml. BUG FIX CONFIRMED.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "pdf.ts (~400 lines) is fine but the two HTML builders share ~40 lines of CSS/toothCells; could be factored into a shared base CSS constant to keep future style changes in sync between Dichiarazione and Prescrizione.",
+    "PdfPreview uses html.replace('<head>', ...) to inject viewport meta - safe here because builders always emit '<head>' verbatim, but a defensive fallback would help if the HTML template ever changes."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a", "frontend": "100%" },
+  "seed_data_creation": "None - used existing seeded declarations (0003/2026, DC-2026-0002, DC-2026-0001) under tecnico@lab.it.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login: tecnico@lab.it / password123. From Home tap any declaration card (or Archivio -> item) to open /declaration/[id]. In the footer, 'Dichiarazione' (testID preview-declaration-button) and 'Prescrizione' (testID preview-prescription-button) open a full-screen Modal with an iframe (web) / WebView (native). Both HTML templates in /app/frontend/src/utils/pdf.ts now set html/body background #ffffff and .sheet { border:none; padding:0; background:#ffffff } - do NOT reintroduce the outer frame. PdfPreview iframe/WebView both explicitly set backgroundColor #FFFFFF. On web the share button may be a no-op (expo-sharing not available) - do not treat that as a bug.",
+  "rca_of_issue": "Root cause of original bug: the HTML templates rendered a .sheet element with an outer border and non-white background, and the WebView/iframe host used a grey/surface background - together this made the exported preview look like a bordered 'screenshot' centered on a coloured page. Fix: removed .sheet border and forced #ffffff on html/body/.sheet in both buildDeclarationHtml and buildPrescriptionHtml, and set backgroundColor #FFFFFF on the iframe (web) and WebView (native) inside PdfPreview. @page A4 portrait with mm margins retained so print export keeps proper page geometry."
+}

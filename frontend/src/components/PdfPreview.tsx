@@ -42,12 +42,13 @@ export function PdfPreview({
         <View style={styles.webWrap}>
           {Platform.OS === "web" ? (
             // @ts-expect-error iframe is web-only DOM element
-            <iframe title={title} srcDoc={source.html} style={{ width: "100%", height: "100%", border: "none", backgroundColor: colors.surfaceTertiary }} />
+            <iframe title={title} srcDoc={source.html} style={{ width: "100%", height: "100%", border: "none", backgroundColor: "#FFFFFF" }} />
           ) : (
             <WebView
               originWhitelist={["*"]}
               source={source}
               style={styles.web}
+              backgroundColor="#FFFFFF"
               testID="preview-webview"
               showsVerticalScrollIndicator
             />
@@ -80,8 +81,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  webWrap: { flex: 1, backgroundColor: colors.surfaceTertiary },
-  web: { flex: 1, backgroundColor: colors.surfaceTertiary },
+  webWrap: { flex: 1, backgroundColor: "#FFFFFF" },
+  web: { flex: 1, backgroundColor: "#FFFFFF" },
   footer: {
     padding: spacing.lg,
     paddingBottom: spacing.md,
