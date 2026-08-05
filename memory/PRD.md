@@ -33,6 +33,11 @@
 - [x] Logo laboratorio: upload dalla galleria (expo-image-picker, con permessi) salvato come data URI e stampato nell'intestazione di dichiarazione e prescrizione.
 - [x] Selettore data a calendario (tap) per data prescrizione e data consegna.
 - [x] Anteprima PDF in-app (WebView/iframe) di dichiarazione e prescrizione, con condivisione/esportazione dal pulsante in fondo all'anteprima.
+- [x] Stampa/export solo del documento (Platform.OS branching: web usa Print.printAsync per stampare solo l'HTML; native genera PDF pulito e condivide).
+- [x] Dichiarazione compattata per stare in 1 sola pagina A4.
+- [x] Fascicolo dei Protocolli di Fabbricazione (CRUD /api/protocols) suddiviso per tipologia, con modelli predefiniti, stampa singola e fascicolo completo in PDF; accessibile da Profilo.
+- [x] Duplica dichiarazione (detail -> /declaration/new?from=<id> con precompilazione, firma esclusa).
+- [x] Filtri archivio: ricerca testo, chip stato, filtro per prescrivente e per intervallo di date (con badge filtri attivi).
 
 ## Architettura backend condiviso (predisposizione)
 - Backend unico FastAPI + MongoDB con API REST per user/profile/clients/materials/declarations, riutilizzabili da futuri frontend (web magazzino, fatturazione).
