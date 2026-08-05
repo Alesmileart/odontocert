@@ -128,7 +128,7 @@ export function buildDeclarationHtml(d: DeclarationData, lab: LabProfile): strin
 <head>
 <meta charset="utf-8" />
 <style>
-  @page { margin: 24px; }
+  @page { size: A4 portrait; margin: 22px; }
   * { box-sizing: border-box; }
   body { font-family: 'Times New Roman', Georgia, serif; color: #111; font-size: 11px; line-height: 1.45; }
   .sheet { border: 1px solid #333; padding: 22px 26px; }
@@ -258,7 +258,8 @@ export function buildDeclarationHtml(d: DeclarationData, lab: LabProfile): strin
 
 export async function exportDeclarationPdf(d: DeclarationData, lab: LabProfile) {
   const html = buildDeclarationHtml(d, lab);
-  const { uri } = await Print.printToFileAsync({ html, base64: false });
+  // A4 portrait (595 x 842 pt) — vertical layout
+  const { uri } = await Print.printToFileAsync({ html, base64: false, width: 595, height: 842 });
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
     await Sharing.shareAsync(uri, {
