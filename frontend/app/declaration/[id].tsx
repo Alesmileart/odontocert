@@ -5,9 +5,17 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { AppText, Card, Badge, Button, Divider } from "@/src/components/ui";
 import { FormSheet } from "@/src/components/FormSheet";
+import { PdfPreview } from "@/src/components/PdfPreview";
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/components/Toast";
-import { exportDeclarationPdf, exportPrescriptionPdf, DeclarationData, LabProfile } from "@/src/utils/pdf";
+import {
+  exportDeclarationPdf,
+  exportPrescriptionPdf,
+  buildDeclarationHtml,
+  buildPrescriptionHtml,
+  DeclarationData,
+  LabProfile,
+} from "@/src/utils/pdf";
 import { colors, fontSize, spacing, radius } from "@/src/theme";
 
 function fmtDate(iso?: string) {
@@ -30,6 +38,7 @@ export default function DeclarationDetail() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportingPresc, setExportingPresc] = useState(false);
+  const [preview, setPreview] = useState<null | "decl" | "presc">(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const load = useCallback(async () => {
@@ -210,23 +219,38 @@ export default function DeclarationDetail() {
         <View style={styles.footerRow}>
           <Button
             title="Dichiarazione"
-            onPress={onExport}
-            loading={exporting}
+            onPress={() => setPreview("decl")}
             icon={<Ionicons name="document-text-outline" size={18} color={colors.onBrandPrimary} />}
             style={styles.footerBtn}
-            testID="export-pdf-button"
+            testID="preview-declaration-button"
           />
           <Button
             title="Prescrizione"
             kind="secondary"
-            onPress={onExportPrescription}
-            loading={exportingPresc}
+            onPress={() => setPreview("presc")}
             icon={<Ionicons name="clipboard-outline" size={18} color={colors.brandPrimary} />}
             style={styles.footerBtn}
-            testID="export-prescription-button"
+            testID="preview-prescription-button"
           />
         </View>
       </View>
+
+      <PdfPreview
+        visible={preview === "decl"}
+        title="Anteprima dichiarazione"
+        html={preview === "decl" ? buildDeclarationHtml(decl, lab) : ""}
+        onClose={() => setPreview(null)}
+        onShare={onExport}
+        sharing={exporting}
+      />
+      <PdfPreview
+        visible={preview === "presc"}
+        title="Anteprima prescrizione"
+        html={preview === "presc" ? buildPrescriptionHtml(decl, lab) : ""}
+        onClose={() => setPreview(null)}
+        onShare={onExportPrescription}
+        sharing={exportingPresc}
+      />
 
       <FormSheet
         visible={confirmDelete}

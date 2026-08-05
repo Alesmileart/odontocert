@@ -32,6 +32,7 @@
 - [x] Dashboard stats + recent, Archive search/filter chips.
 - [x] Logo laboratorio: upload dalla galleria (expo-image-picker, con permessi) salvato come data URI e stampato nell'intestazione di dichiarazione e prescrizione.
 - [x] Selettore data a calendario (tap) per data prescrizione e data consegna.
+- [x] Anteprima PDF in-app (WebView/iframe) di dichiarazione e prescrizione, con condivisione/esportazione dal pulsante in fondo all'anteprima.
 
 ## Architettura backend condiviso (predisposizione)
 - Backend unico FastAPI + MongoDB con API REST per user/profile/clients/materials/declarations, riutilizzabili da futuri frontend (web magazzino, fatturazione).
