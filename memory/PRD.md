@@ -21,22 +21,23 @@
 
 ## Implemented (2026-06)
 - [x] JWT auth: signup/login/me, secure token storage.
-- [x] Lab profile auto-fill (GET/PUT /api/profile).
+- [x] Lab profile auto-fill (GET/PUT /api/profile) + Reg. Min. Salute, Reg. Imprese, dicitura autorizzazione.
 - [x] Clients & Materials library CRUD with bottom-sheet editor.
-- [x] 5-step declaration wizard (Cliente → Dispositivo → Materiali → Conformità → Firma) with progress bar.
-- [x] Auto declaration numbering DC-YYYY-NNNN, draft vs issued status.
-- [x] Signature capture pad.
-- [x] PDF generation (HTML template) + share sheet.
-- [x] Dashboard with monthly/yearly/total/clients stats + recent list + FAB.
-- [x] Archive with search + status filter chips.
-- [x] Verified: backend 17/17 pytest, frontend e2e flows pass.
+- [x] Declaration wizard restructured to classic Italian format: Lavoro/Paziente → Arcata (schema denti FDI) → Prescrizione/Materiali → Etichetta/Note → Firma.
+- [x] Dental tooth chart selector (FDI 18-28 / 48-38) with ☒ marking.
+- [x] PDF layout faithful to the standard "Dichiarazione di conformità alle normative CE": intestazione Ministero della Salute + logo lab, blocco fabbricante, testo Direttiva 93/42/CEE, codice lavoro, schema dentale, prescrizione, PROTOCOLLO DI FABBRICAZIONE, MATERIALI UTILIZZATI, annotazioni, firma "Il legale rappresentante", ETICHETTA staccabile (consegna, giorni, condizioni conservazione, NON STERILE).
+- [x] Auto codice lavoro NNNN/YYYY, draft vs issued status.
+- [x] Signature capture pad + PDF share.
+- [x] Dashboard stats + recent list, Archive search/filter chips.
+- [x] Verified: backend curl (new format), wizard steps, tooth chart, PDF rendering screenshot.
 
 ## Backlog (prioritized)
-- P1: Logo laboratorio upload nel profilo (mostrato in PDF).
+- P1: Logo laboratorio upload nel profilo (già supportato nel PDF, manca UI upload immagine).
 - P1: Duplica dichiarazione / usa come modello.
-- P2: Filtro archivio per cliente e per data range.
-- P2: Numerazione personalizzabile / prefisso.
-- P2: me endpoint 401 vs 403 cosmetic fix; migrate shadow* → boxShadow.
+- P1: Date picker per data prescrizione/consegna (ora testo GG/MM/AAAA).
+- P2: Toggle Direttiva 93/42/CEE vs Regolamento UE 2017/745 (MDR).
+- P2: Filtro archivio per prescrivente e per data range.
+- P2: Barcode/QR sul PDF come nell'originale.
 
 ## Next Tasks
 - Await user feedback; prioritize logo upload and PDF branding.

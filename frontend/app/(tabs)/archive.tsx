@@ -14,11 +14,12 @@ const EMPTY_IMG =
 type Decl = {
   id: string;
   number: string;
-  patient_ref: string;
+  codice_lavoro?: string;
+  patient_name?: string;
+  patient_ref?: string;
   device_type: string;
   issue_date: string;
   status: string;
-  client_snapshot: { name?: string };
 };
 
 const FILTERS = [
@@ -67,9 +68,9 @@ export default function Archive() {
       if (!q) return true;
       return (
         d.number.toLowerCase().includes(q) ||
+        (d.codice_lavoro || "").toLowerCase().includes(q) ||
         (d.device_type || "").toLowerCase().includes(q) ||
-        (d.patient_ref || "").toLowerCase().includes(q) ||
-        (d.client_snapshot?.name || "").toLowerCase().includes(q)
+        (d.patient_name || d.patient_ref || "").toLowerCase().includes(q)
       );
     });
   }, [items, query, filter]);
@@ -153,7 +154,7 @@ export default function Archive() {
               <Card style={styles.card}>
                 <View style={styles.cardTop}>
                   <AppText variant="monoBold" size={fontSize.sm} color={colors.brandPrimary}>
-                    {item.number}
+                    {item.codice_lavoro || item.number}
                   </AppText>
                   <Badge status={item.status} />
                 </View>
@@ -163,7 +164,7 @@ export default function Archive() {
                 <View style={styles.meta}>
                   <Ionicons name="person-outline" size={14} color={colors.muted} />
                   <AppText size={fontSize.sm} color={colors.muted}>
-                    {item.client_snapshot?.name || "—"} · {fmtDate(item.issue_date)}
+                    {item.patient_name || item.patient_ref || "—"} · {fmtDate(item.issue_date)}
                   </AppText>
                 </View>
               </Card>

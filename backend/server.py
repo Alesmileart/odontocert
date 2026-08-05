@@ -108,9 +108,11 @@ class Profile(BaseModel):
     address: str = ""
     city: str = ""
     vat: str = ""
-    registration_number: str = ""
+    registration_number: str = ""  # Reg. Min. Salute
+    reg_imprese: str = ""           # Reg. Imprese
     phone: str = ""
     email: str = ""
+    authorized_label: str = "Laboratorio Odontotecnico Autorizzato"
     logo_base64: str = ""
 
 
@@ -168,13 +170,34 @@ class Conformity(BaseModel):
 
 class DeclarationInput(BaseModel):
     client_id: Optional[str] = None
-    client_snapshot: dict
+    client_snapshot: dict = {}
+    # Lavoro / paziente
+    codice_lavoro: str = ""
+    patient_name: str = ""
     patient_ref: str = ""
-    device_type: str = ""
-    device_description: str = ""
+    device_type: str = ""          # identificato come (es. "PROTESI PROVVISORIA")
+    device_description: str = ""   # dettaglio (es. "PROVVISORIO AVVITATO")
+    teeth: List[int] = []          # elementi dentali FDI selezionati
+    # Prescrizione
+    prescription_code: str = ""
+    prescription_date: str = ""
+    prescriber: str = ""
+    # Testi
+    legal_text: str = ""
+    protocollo: str = ""
+    materiali_intro: str = ""
+    annotations: str = ""
     materials: List[DeclarationMaterial] = []
     conformity: Conformity = Conformity()
-    norm_reference: str = "Regolamento (UE) 2017/745 (MDR) - Allegato XIII"
+    norm_reference: str = "Direttiva 93/42/CEE - Allegato I e VIII"
+    # Etichetta
+    delivery_date: str = ""
+    usage_days: str = ""
+    storage_no_flip: bool = True
+    storage_no_shake: bool = True
+    storage_proper_place: bool = True
+    non_sterile: bool = True
+    # Firma
     technician_name: str = ""
     signature_base64: str = ""
     issue_date: Optional[str] = None
@@ -327,12 +350,16 @@ async def get_declaration(declaration_id: str, user: dict = Depends(get_current_
 async def create_declaration(data: DeclarationInput, user: dict = Depends(get_current_user)):
     year = datetime.now(timezone.utc).year
     number = await next_declaration_number(user["id"])
+    count = await db.declarations.count_documents({"user_id": user["id"], "year": year})
+    payload = data.dict()
+    if not payload.get("codice_lavoro"):
+        payload["codice_lavoro"] = f"{count + 1:04d}/{year}"
     doc = {
         "id": str(uuid.uuid4()),
         "number": number,
         "year": year,
         "user_id": user["id"],
-        **data.dict(),
+        **payload,
         "status": "issued" if data.signature_base64 else "draft",
         "created_at": now_iso(),
         "issue_date": data.issue_date or now_iso(),

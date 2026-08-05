@@ -2,33 +2,35 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 
 type Material = { name: string; manufacturer?: string; ce_number?: string; lot?: string; category?: string };
-type Conformity = {
-  mdr_2017_745?: boolean;
-  biocompatible?: boolean;
-  single_patient?: boolean;
-  made_to_prescription?: boolean;
-  notes?: string;
-};
+type Conformity = { notes?: string };
 
 export type DeclarationData = {
   number?: string;
+  codice_lavoro?: string;
   issue_date?: string;
+  patient_name?: string;
   patient_ref?: string;
   device_type?: string;
   device_description?: string;
+  teeth?: number[];
+  prescription_code?: string;
+  prescription_date?: string;
+  prescriber?: string;
+  legal_text?: string;
+  protocollo?: string;
+  materiali_intro?: string;
+  annotations?: string;
   norm_reference?: string;
   technician_name?: string;
   signature_base64?: string;
+  delivery_date?: string;
+  usage_days?: string;
+  storage_no_flip?: boolean;
+  storage_no_shake?: boolean;
+  storage_proper_place?: boolean;
+  non_sterile?: boolean;
   materials?: Material[];
   conformity?: Conformity;
-  client_snapshot?: {
-    name?: string;
-    clinic?: string;
-    address?: string;
-    vat?: string;
-    email?: string;
-    phone?: string;
-  };
 };
 
 export type LabProfile = {
@@ -38,43 +40,80 @@ export type LabProfile = {
   city?: string;
   vat?: string;
   registration_number?: string;
+  reg_imprese?: string;
+  authorized_label?: string;
   phone?: string;
   email?: string;
+  logo_base64?: string;
 };
+
+export const DEFAULT_LEGAL_TEXT =
+  "il dispositivo medico su misura ad uso odontoiatrico qui sotto designato è conforme nella sua costruzione ai requisiti di cui all'allegato I e ai disposti dell'allegato VIII della Direttiva 93/42/CEE attuata dal D.Lgs. 46/97 ed emendato col D.Lgs. 37/10 di recepimento Direttiva 2007/47/CE.";
+
+export const DEFAULT_PROTOCOLLO =
+  "Il dispositivo medico su misura ad uso odontoiatrico in oggetto è stato eseguito secondo le fasi di lavorazione riportate nel protocollo generale di fabbricazione adottato presso il laboratorio del fabbricante e trascritte in sintesi nel fascicolo tecnico allegato alla prescrizione e conservate su supporto informatico.";
+
+export const DEFAULT_MATERIALI_INTRO =
+  "Per la fabbricazione del dispositivo medico su misura ad uso odontoiatrico in oggetto sono stati utilizzati esclusivamente materiali con marcatura CE. La loro rintracciabilità è garantita dalla documentazione riportata nel fascicolo tecnico allegato alla prescrizione e conservata su supporto informatico.";
+
+export const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
+export const LOWER_TEETH = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
 function fmtDate(iso?: string) {
   if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
-  } catch {
-    return iso;
-  }
+  if (iso.includes("/")) return iso;
+  const dt = new Date(iso);
+  if (isNaN(dt.getTime())) return iso;
+  return dt.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-function check(v?: boolean) {
-  return v ? "&#9745;" : "&#9744;";
+function toothCells(row: number[], selected: Set<number>, numbersOnTop: boolean) {
+  const numbers = row.map((t) => `<td class="tnum">${t}</td>`).join("");
+  const boxes = row
+    .map((t) => `<td class="tbox">${selected.has(t) ? "&#9746;" : "&#9744;"}</td>`)
+    .join("");
+  return numbersOnTop
+    ? `<tr>${numbers}</tr><tr>${boxes}</tr>`
+    : `<tr>${boxes}</tr><tr>${numbers}</tr>`;
 }
 
 export function buildDeclarationHtml(d: DeclarationData, lab: LabProfile): string {
-  const client = d.client_snapshot || {};
-  const c = d.conformity || {};
-  const materialsRows =
-    (d.materials || [])
-      .map(
-        (m) => `
-      <tr>
-        <td>${m.name || "-"}</td>
-        <td>${m.manufacturer || "-"}</td>
-        <td class="mono">${m.ce_number || "-"}</td>
-        <td class="mono">${m.lot || "-"}</td>
-      </tr>`
-      )
-      .join("") ||
-    `<tr><td colspan="4" style="text-align:center;color:#7A857F">Nessun materiale indicato</td></tr>`;
+  const selected = new Set(d.teeth || []);
+  const legal = d.legal_text || DEFAULT_LEGAL_TEXT;
+  const protocollo = d.protocollo || DEFAULT_PROTOCOLLO;
+  const materialiIntro = d.materiali_intro || DEFAULT_MATERIALI_INTRO;
+
+  const materialsList =
+    (d.materials || []).length > 0
+      ? `<div class="matlist">${(d.materials || [])
+          .map(
+            (m) =>
+              `<span class="matchip">${m.name}${m.ce_number ? ` · CE ${m.ce_number}` : ""}${
+                m.lot ? ` · Lotto ${m.lot}` : ""
+              }</span>`
+          )
+          .join("")}</div>`
+      : "";
+
+  const labLogo = lab.logo_base64
+    ? `<img src="${lab.logo_base64}" class="lab-logo" />`
+    : `<div class="lab-logo-text">${lab.lab_name || ""}</div>`;
+
+  const deviceLine = [d.device_type, d.device_description].filter(Boolean).join(" &gt;&gt; ");
+
+  const storageItems = [
+    d.storage_no_flip ? "Non capovolgere la confezione" : null,
+    d.storage_no_shake ? "Non sbattere l'involucro" : null,
+    d.storage_proper_place ? "Conservare in luogo adeguato" : null,
+    d.non_sterile ? "<strong>NON STERILE</strong> (Non sterilizzare a caldo)" : null,
+  ]
+    .filter(Boolean)
+    .map((s) => `<div>${s}</div>`)
+    .join("");
 
   const signatureImg = d.signature_base64
-    ? `<img src="${d.signature_base64}" style="height:70px;object-fit:contain" />`
-    : `<div style="height:70px"></div>`;
+    ? `<img src="${d.signature_base64}" class="sig" />`
+    : `<div class="sig"></div>`;
 
   return `
 <!DOCTYPE html>
@@ -82,95 +121,127 @@ export function buildDeclarationHtml(d: DeclarationData, lab: LabProfile): strin
 <head>
 <meta charset="utf-8" />
 <style>
+  @page { margin: 24px; }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #111412; padding: 32px; font-size: 12px; }
-  .mono { font-family: 'Courier New', monospace; }
-  h1 { font-size: 20px; color: #2D4A3E; margin: 0 0 2px; }
-  .sub { color: #7A857F; font-size: 11px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #2D4A3E; padding-bottom: 12px; margin-bottom: 20px; }
-  .lab { text-align: right; font-size: 11px; line-height: 1.5; }
-  .lab strong { color: #2D4A3E; font-size: 13px; }
-  .title { text-align: center; font-size: 16px; font-weight: bold; margin: 18px 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .norm { text-align: center; color: #7A857F; margin-bottom: 20px; font-size: 11px; }
-  .grid { display: flex; gap: 16px; margin-bottom: 18px; }
-  .box { flex: 1; border: 1px solid #E3E8E5; border-radius: 8px; padding: 12px; }
-  .box h3 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; color: #2D4A3E; letter-spacing: 0.5px; }
-  .row { margin-bottom: 4px; }
-  .row .k { color: #7A857F; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
-  th { background: #F0F3F1; text-align: left; padding: 8px; font-size: 10px; text-transform: uppercase; color: #2D332F; border-bottom: 1px solid #C4CCC7; }
-  td { padding: 8px; border-bottom: 1px solid #EBF0EC; font-size: 11px; }
-  .decl { border: 1px solid #E3E8E5; border-radius: 8px; padding: 14px; margin-bottom: 18px; background: #F3F7F4; }
-  .decl li { margin-bottom: 6px; list-style: none; }
-  .sign { display: flex; justify-content: space-between; margin-top: 40px; }
-  .sign .col { width: 45%; }
-  .sign .line { border-top: 1px solid #111412; padding-top: 4px; color: #7A857F; }
-  .badge { display:inline-block; background:#2D4A3E; color:#fff; padding:2px 8px; border-radius:999px; font-size:10px; }
+  body { font-family: 'Times New Roman', Georgia, serif; color: #111; font-size: 11px; line-height: 1.45; }
+  .sheet { border: 1px solid #333; padding: 22px 26px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+  .min { font-size: 12px; }
+  .min .b { font-weight: bold; font-style: italic; }
+  .min .s { font-style: italic; font-size: 10px; }
+  .lab-logo { max-height: 54px; }
+  .lab-logo-text { font-weight: bold; font-style: italic; color: #1a5b34; font-size: 14px; text-align: right; }
+  h1 { text-align: center; font-size: 15px; margin: 18px 0 14px; }
+  .center { text-align: center; }
+  .fab { text-align: center; font-weight: bold; margin: 6px 0; line-height: 1.5; }
+  .fab .name { font-size: 12px; }
+  .attesta { text-align: center; margin: 10px 0; }
+  .legal { text-align: justify; font-weight: bold; margin: 8px 0 14px; }
+  .kv { margin: 4px 0; }
+  .kv b { display: inline-block; min-width: 130px; }
+  .strong { font-weight: bold; }
+  table.teeth { border-collapse: collapse; margin: 12px auto; }
+  table.teeth td { width: 20px; height: 18px; text-align: center; font-size: 9px; }
+  table.teeth td.tbox { border: none; font-size: 15px; line-height: 1; }
+  table.teeth td.tnum { color: #333; }
+  .section-bar { background: #eee; border-top: 1px solid #333; border-bottom: 1px solid #333; text-align: center; font-weight: bold; padding: 3px; margin-top: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .section-body { text-align: justify; padding: 6px 2px; }
+  .matlist { margin-top: 4px; }
+  .matchip { display: inline-block; border: 1px solid #999; border-radius: 3px; padding: 1px 6px; margin: 2px 3px 2px 0; font-size: 10px; }
+  .sign-area { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 26px; }
+  .sig { width: 200px; height: 60px; object-fit: contain; }
+  .sig-label { border-top: 1px solid #111; text-align: center; padding-top: 3px; width: 220px; font-style: italic; }
+  .cut { border-top: 2px dashed #666; margin: 22px 0 8px; position: relative; text-align: left; }
+  .cut span { position: absolute; top: -9px; left: 0; background: #fff; padding-right: 6px; }
+  .label-title { text-align: center; font-weight: bold; background: #eee; border: 1px solid #333; padding: 3px; text-transform: uppercase; }
+  .label-grid { display: flex; border: 1px solid #333; border-top: none; }
+  .label-col { flex: 1; padding: 10px 12px; }
+  .label-col.left { border-right: 1px solid #333; }
+  .label-col h4 { margin: 0 0 4px; font-size: 11px; }
+  .small { font-size: 9px; color: #333; }
 </style>
 </head>
 <body>
-  <div class="header">
-    <div>
-      <h1>${lab.lab_name || "Laboratorio Odontotecnico"}</h1>
-      <div class="sub">${lab.address || ""} ${lab.city ? "· " + lab.city : ""}</div>
+  <div class="sheet">
+    <div class="header">
+      <div class="min">
+        <div class="b">Ministero della Salute</div>
+        <div class="s">${lab.authorized_label || "Laboratorio Odontotecnico Autorizzato"}</div>
+      </div>
+      <div>${labLogo}</div>
     </div>
-    <div class="lab">
-      <strong>${lab.lab_name || ""}</strong><br/>
-      ${lab.responsible_person ? "Resp.: " + lab.responsible_person + "<br/>" : ""}
-      ${lab.vat ? "P.IVA: " + lab.vat + "<br/>" : ""}
-      ${lab.registration_number ? "Iscr.: " + lab.registration_number + "<br/>" : ""}
-      ${lab.phone || ""} ${lab.email ? "· " + lab.email : ""}
+
+    <h1>Dichiarazione di conformità alle normative CE</h1>
+
+    <div class="center">Con la presente dichiarazione, il fabbricante:</div>
+
+    <div class="fab">
+      <div class="name">${lab.lab_name || "Laboratorio Odontotecnico"}</div>
+      <div>${lab.address || ""}${lab.phone ? " cell." + lab.phone : ""} ${lab.city || ""}</div>
+      <div>${lab.registration_number ? "Reg. Min. Salute: " + lab.registration_number : ""} ${
+    lab.reg_imprese ? "Reg. Imprese: " + lab.reg_imprese : ""
+  }</div>
     </div>
-  </div>
 
-  <div class="title">Dichiarazione di Conformità</div>
-  <div class="norm">Dispositivo medico su misura — ${d.norm_reference || "Regolamento (UE) 2017/745 (MDR)"}</div>
+    <div class="attesta">attesta sotto la propria esclusiva responsabilità che</div>
 
-  <div style="text-align:center;margin-bottom:18px">
-    <span class="badge">N. ${d.number || "—"}</span>
-    &nbsp;&nbsp; Data di emissione: <strong>${fmtDate(d.issue_date)}</strong>
-  </div>
+    <div class="legal">${legal}</div>
 
-  <div class="grid">
-    <div class="box">
-      <h3>Committente / Odontoiatra</h3>
-      <div class="row"><span class="k">Nome:</span> ${client.name || "-"}</div>
-      <div class="row"><span class="k">Studio:</span> ${client.clinic || "-"}</div>
-      <div class="row"><span class="k">Indirizzo:</span> ${client.address || "-"}</div>
-      <div class="row"><span class="k">P.IVA:</span> <span class="mono">${client.vat || "-"}</span></div>
+    <div class="kv"><b>Codice lavoro:</b> <span class="strong">${d.codice_lavoro || d.number || "—"}</span></div>
+    <div class="kv"><b>Il dispositivo è identificato come:</b></div>
+    <div class="strong" style="margin:2px 0 4px">${deviceLine || "—"}</div>
+
+    <table class="teeth">
+      ${toothCells(UPPER_TEETH, selected, true)}
+      ${toothCells(LOWER_TEETH, selected, false)}
+    </table>
+
+    <div class="kv">E' stato realizzato ed è destinato esclusivamente per il paziente:</div>
+    <div class="strong">${d.patient_name || d.patient_ref || "—"}</div>
+
+    <div class="kv" style="margin-top:8px">Il dispositivo è conforme alle specifiche espresse nella prescrizione:</div>
+    <div class="kv"><b>Codice:</b> <span class="strong">${d.prescription_code || "—"}</span></div>
+    <div class="kv"><b>Data:</b> ${fmtDate(d.prescription_date) || "—"}</div>
+    <div class="kv"><b>Prescrivente:</b> ${d.prescriber || "—"}</div>
+
+    <div class="section-bar">Protocollo di fabbricazione adottato</div>
+    <div class="section-body">${protocollo}</div>
+
+    <div class="section-bar">Materiali utilizzati per la fabbricazione</div>
+    <div class="section-body">${materialiIntro}${materialsList}</div>
+
+    <div class="kv" style="margin-top:12px">Annotazioni od eventuali eccezioni di livello accettabile che non è stato possibile rimuovere:</div>
+    <div class="strong">(${d.annotations || "Nessuna"})</div>
+
+    <div class="sign-area">
+      <div>Data, ${fmtDate(d.issue_date)}</div>
+      <div style="text-align:center">
+        ${signatureImg}
+        <div class="sig-label">Il legale rappresentante<br/>${d.technician_name || lab.responsible_person || ""}</div>
+      </div>
     </div>
-    <div class="box">
-      <h3>Dispositivo</h3>
-      <div class="row"><span class="k">Rif. paziente:</span> ${d.patient_ref || "-"}</div>
-      <div class="row"><span class="k">Tipo:</span> ${d.device_type || "-"}</div>
-      <div class="row"><span class="k">Descrizione:</span> ${d.device_description || "-"}</div>
-    </div>
-  </div>
 
-  <h3 style="font-size:11px;text-transform:uppercase;color:#2D4A3E;letter-spacing:0.5px;margin-bottom:6px">Materiali impiegati</h3>
-  <table>
-    <thead>
-      <tr><th>Materiale</th><th>Produttore</th><th>Marcatura CE</th><th>Lotto</th></tr>
-    </thead>
-    <tbody>${materialsRows}</tbody>
-  </table>
+    <div class="cut"><span>&#9986;</span></div>
 
-  <div class="decl">
-    <h3 style="margin:0 0 8px;font-size:11px;text-transform:uppercase;color:#2D4A3E">Il sottoscritto dichiara che:</h3>
-    <li>${check(c.mdr_2017_745)} Il dispositivo è conforme ai requisiti generali di sicurezza e prestazione del Reg. (UE) 2017/745.</li>
-    <li>${check(c.made_to_prescription)} È stato fabbricato su misura secondo prescrizione del professionista sanitario.</li>
-    <li>${check(c.single_patient)} È destinato all'uso esclusivo del paziente sopra indicato.</li>
-    <li>${check(c.biocompatible)} I materiali impiegati sono biocompatibili e provvisti di marcatura CE.</li>
-    ${c.notes ? `<li style="margin-top:8px;color:#3A423D"><em>Note: ${c.notes}</em></li>` : ""}
-  </div>
-
-  <div class="sign">
-    <div class="col">
-      <div>Luogo e data: ${lab.city || ""}, ${fmtDate(d.issue_date)}</div>
-    </div>
-    <div class="col" style="text-align:center">
-      ${signatureImg}
-      <div class="line">${d.technician_name || lab.responsible_person || "L'Odontotecnico"}</div>
+    <div class="label-title">Etichetta</div>
+    <div class="label-grid">
+      <div class="label-col left">
+        <div>La confezione contiene un dispositivo medico su misura ad uso odontoiatrico identificato come:</div>
+        <h4>${d.device_type || "—"}</h4>
+        <div style="margin-top:16px"><strong>Fabbricato da:</strong></div>
+        <div>${lab.lab_name || ""}</div>
+        <div class="small">${lab.address || ""} ${lab.city || ""}</div>
+        <div class="small">${lab.registration_number ? "Reg. Min. Sal.: " + lab.registration_number : ""} ${
+    lab.reg_imprese ? "Reg. Imp.: " + lab.reg_imprese : ""
+  }</div>
+      </div>
+      <div class="label-col">
+        <div class="kv"><b>Codice lavoro:</b> <span class="strong">${d.codice_lavoro || "—"}</span></div>
+        <div class="kv"><b>Data di consegna:</b> ${fmtDate(d.delivery_date) || fmtDate(d.issue_date)}</div>
+        <div class="kv"><b>Termini per l'utilizzo dalla data di consegna:</b> ${d.usage_days || "—"} giorni</div>
+        <div style="margin-top:8px"><strong>Condizioni specifiche di conservazione e manipolazione:</strong></div>
+        ${storageItems}
+      </div>
     </div>
   </div>
 </body>
@@ -182,7 +253,11 @@ export async function exportDeclarationPdf(d: DeclarationData, lab: LabProfile) 
   const { uri } = await Print.printToFileAsync({ html, base64: false });
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
-    await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Condividi dichiarazione", UTI: "com.adobe.pdf" });
+    await Sharing.shareAsync(uri, {
+      mimeType: "application/pdf",
+      dialogTitle: "Condividi dichiarazione",
+      UTI: "com.adobe.pdf",
+    });
   }
   return uri;
 }

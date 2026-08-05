@@ -18,6 +18,8 @@ type Profile = {
   city: string;
   vat: string;
   registration_number: string;
+  reg_imprese: string;
+  authorized_label: string;
   phone: string;
   email: string;
   logo_base64: string;
@@ -30,6 +32,8 @@ const empty: Profile = {
   city: "",
   vat: "",
   registration_number: "",
+  reg_imprese: "",
+  authorized_label: "Laboratorio Odontotecnico Autorizzato",
   phone: "",
   email: "",
   logo_base64: "",
@@ -109,12 +113,14 @@ export default function ProfileScreen() {
         </AppText>
 
         <Field label="Nome laboratorio" value={profile.lab_name} onChangeText={up("lab_name")} placeholder="Laboratorio Odontotecnico Rossi" testID="lab-name-input" />
-        <Field label="Responsabile" value={profile.responsible_person} onChangeText={up("responsible_person")} placeholder="Mario Rossi" testID="lab-responsible-input" />
+        <Field label="Dicitura autorizzazione" value={profile.authorized_label} onChangeText={up("authorized_label")} placeholder="Laboratorio Odontotecnico Autorizzato" testID="lab-authorized-input" />
+        <Field label="Responsabile / Legale rappr." value={profile.responsible_person} onChangeText={up("responsible_person")} placeholder="Mario Rossi" testID="lab-responsible-input" />
         <Field label="Indirizzo" value={profile.address} onChangeText={up("address")} placeholder="Via Roma 1" testID="lab-address-input" />
         <Field label="Città" value={profile.city} onChangeText={up("city")} placeholder="Milano" testID="lab-city-input" />
         <Field label="Partita IVA" value={profile.vat} onChangeText={up("vat")} placeholder="IT01234567890" mono autoCapitalize="characters" testID="lab-vat-input" />
-        <Field label="N. iscrizione / registrazione" value={profile.registration_number} onChangeText={up("registration_number")} placeholder="Es. registrazione dispositivi" mono autoCapitalize="characters" testID="lab-registration-input" />
-        <Field label="Telefono" value={profile.phone} onChangeText={up("phone")} placeholder="+39 02 1234567" keyboardType="phone-pad" testID="lab-phone-input" />
+        <Field label="Reg. Min. Salute" value={profile.registration_number} onChangeText={up("registration_number")} placeholder="Es. ITCA01036549" mono autoCapitalize="characters" testID="lab-registration-input" />
+        <Field label="Reg. Imprese" value={profile.reg_imprese} onChangeText={up("reg_imprese")} placeholder="Es. SS-195555" mono autoCapitalize="characters" testID="lab-regimprese-input" />
+        <Field label="Telefono / Cellulare" value={profile.phone} onChangeText={up("phone")} placeholder="+39 348 4039419" keyboardType="phone-pad" testID="lab-phone-input" />
         <Field label="Email" value={profile.email} onChangeText={up("email")} placeholder="info@laboratorio.it" keyboardType="email-address" autoCapitalize="none" testID="lab-email-input" />
 
         <Button title="Salva dati laboratorio" onPress={save} loading={saving} testID="save-profile-button" />

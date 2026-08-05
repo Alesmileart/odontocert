@@ -8,6 +8,7 @@ import { AppText, Button, Card } from "@/src/components/ui";
 import { Field } from "@/src/components/Field";
 import { FormSheet } from "@/src/components/FormSheet";
 import { SignaturePad, SignaturePadRef } from "@/src/components/SignaturePad";
+import { ToothChart } from "@/src/components/ToothChart";
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/components/Toast";
 import { colors, fontSize, spacing, radius } from "@/src/theme";
@@ -16,10 +17,8 @@ type Client = { id: string; name: string; clinic: string; address: string; vat: 
 type Material = { id: string; name: string; manufacturer: string; ce_number: string; lot_default: string; category: string };
 type DeclMaterial = { name: string; manufacturer: string; ce_number: string; lot: string; category: string };
 
-const STEPS = ["Cliente", "Dispositivo", "Materiali", "Conformità", "Firma"];
+const STEPS = ["Lavoro", "Arcata", "Prescrizione", "Etichetta", "Firma"];
 const emptyMat: DeclMaterial = { name: "", manufacturer: "", ce_number: "", lot: "", category: "" };
-
-const NORM_DEFAULT = "Regolamento (UE) 2017/745 (MDR) - Allegato XIII";
 
 export default function NewDeclaration() {
   const insets = useSafeAreaInsets();
@@ -32,21 +31,24 @@ export default function NewDeclaration() {
   const [libMaterials, setLibMaterials] = useState<Material[]>([]);
   const [saving, setSaving] = useState(false);
 
-  // form data
-  const [clientId, setClientId] = useState<string | null>(null);
-  const [client, setClient] = useState<Client>({ id: "", name: "", clinic: "", address: "", vat: "", email: "", phone: "" });
-  const [patientRef, setPatientRef] = useState("");
+  // Step 1 — Lavoro & paziente
+  const [codiceLavoro, setCodiceLavoro] = useState("");
+  const [patientName, setPatientName] = useState("");
   const [deviceType, setDeviceType] = useState("");
   const [deviceDescription, setDeviceDescription] = useState("");
+  // Step 2 — Arcata
+  const [teeth, setTeeth] = useState<number[]>([]);
+  // Step 3 — Prescrizione & materiali
+  const [prescriptionCode, setPrescriptionCode] = useState("");
+  const [prescriptionDate, setPrescriptionDate] = useState("");
+  const [prescriber, setPrescriber] = useState("");
   const [materials, setMaterials] = useState<DeclMaterial[]>([]);
-  const [conformity, setConformity] = useState({
-    mdr_2017_745: true,
-    made_to_prescription: true,
-    single_patient: true,
-    biocompatible: true,
-    notes: "",
-  });
-  const [normRef, setNormRef] = useState(NORM_DEFAULT);
+  // Step 4 — Etichetta & note
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [usageDays, setUsageDays] = useState("30");
+  const [storage, setStorage] = useState({ no_flip: true, no_shake: true, proper_place: true, non_sterile: true });
+  const [annotations, setAnnotations] = useState("");
+  // Step 5 — Firma
   const [technicianName, setTechnicianName] = useState("");
 
   const [matSheet, setMatSheet] = useState(false);
@@ -68,17 +70,11 @@ export default function NewDeclaration() {
     }, [load])
   );
 
-  const selectClient = (c: Client) => {
-    setClientId(c.id);
-    setClient(c);
-  };
-
-  const addLibMaterial = (m: Material) => {
+  const addLibMaterial = (m: Material) =>
     setMaterials((prev) => [
       ...prev,
       { name: m.name, manufacturer: m.manufacturer, ce_number: m.ce_number, lot: m.lot_default, category: m.category },
     ]);
-  };
 
   const addCustomMaterial = () => {
     if (!customMat.name.trim()) {
@@ -95,14 +91,13 @@ export default function NewDeclaration() {
     setMaterials((prev) => prev.map((m, i) => (i === idx ? { ...m, lot } : m)));
 
   const canNext = () => {
-    if (step === 0) return !!client.name.trim();
-    if (step === 1) return !!deviceType.trim();
+    if (step === 0) return !!patientName.trim() && !!deviceType.trim();
     return true;
   };
 
   const goNext = () => {
     if (!canNext()) {
-      toast.show(step === 0 ? "Seleziona o inserisci un cliente" : "Indica il tipo di dispositivo", "error");
+      toast.show("Inserisci il paziente e l'identificazione del dispositivo", "error");
       return;
     }
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -114,21 +109,24 @@ export default function NewDeclaration() {
   };
 
   const buildPayload = (signature: string) => ({
-    client_id: clientId,
-    client_snapshot: {
-      name: client.name,
-      clinic: client.clinic,
-      address: client.address,
-      vat: client.vat,
-      email: client.email,
-      phone: client.phone,
-    },
-    patient_ref: patientRef,
+    client_snapshot: {},
+    codice_lavoro: codiceLavoro,
+    patient_name: patientName,
+    patient_ref: patientName,
     device_type: deviceType,
     device_description: deviceDescription,
+    teeth,
+    prescription_code: prescriptionCode,
+    prescription_date: prescriptionDate,
+    prescriber,
     materials,
-    conformity,
-    norm_reference: normRef,
+    annotations,
+    delivery_date: deliveryDate,
+    usage_days: usageDays,
+    storage_no_flip: storage.no_flip,
+    storage_no_shake: storage.no_shake,
+    storage_proper_place: storage.proper_place,
+    non_sterile: storage.non_sterile,
     technician_name: technicianName,
     signature_base64: signature,
   });
@@ -145,16 +143,11 @@ export default function NewDeclaration() {
     }
   };
 
-  const issue = () => {
-    // triggers signature read -> onOK/onEmpty
-    sigRef.current?.read();
-  };
-
+  const issue = () => sigRef.current?.read();
   const progress = (step + 1) / STEPS.length;
 
   return (
     <View style={styles.container}>
-      {/* Header + progress */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerRow}>
           <Pressable onPress={goBack} hitSlop={10} testID="wizard-back">
@@ -175,11 +168,10 @@ export default function NewDeclaration() {
         </View>
       </View>
 
-      {/* Content */}
       {step === 4 ? (
         <View style={styles.signStep}>
           <AppText variant="bold" size={fontSize.xl}>
-            Firma del tecnico
+            Firma del legale rappresentante
           </AppText>
           <AppText size={fontSize.base} color={colors.muted} style={{ marginBottom: spacing.md }}>
             Firma nell'area sottostante per emettere la dichiarazione.
@@ -188,7 +180,7 @@ export default function NewDeclaration() {
             label="Nome firmatario"
             value={technicianName}
             onChangeText={setTechnicianName}
-            placeholder="Nome dell'odontotecnico"
+            placeholder="Es. Dettori Alessandro"
             testID="technician-name-input"
           />
           <SignaturePad
@@ -207,77 +199,73 @@ export default function NewDeclaration() {
           {step === 0 && (
             <>
               <AppText variant="bold" size={fontSize.xl} style={styles.stepTitle}>
-                Committente
+                Lavoro e paziente
               </AppText>
-              {clients.length > 0 && (
-                <>
-                  <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.miniLabel}>
-                    DALL'ANAGRAFICA
-                  </AppText>
-                  <View style={styles.clientList}>
-                    {clients.map((c) => {
-                      const active = clientId === c.id;
-                      return (
-                        <Pressable key={c.id} onPress={() => selectClient(c)} testID={`select-client-${c.id}`}>
-                          <Card style={[styles.clientCard, active && styles.clientCardActive]}>
-                            <View style={{ flex: 1 }}>
-                              <AppText variant="semibold" size={fontSize.base}>
-                                {c.name}
-                              </AppText>
-                              <AppText size={fontSize.sm} color={colors.muted}>
-                                {c.clinic || "—"}
-                              </AppText>
-                            </View>
-                            {active ? <Ionicons name="checkmark-circle" size={22} color={colors.brandPrimary} /> : null}
-                          </Card>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </>
-              )}
-              <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.miniLabel}>
-                DATI COMMITTENTE
-              </AppText>
-              <Field label="Nome / Odontoiatra *" value={client.name} onChangeText={(t) => { setClient({ ...client, name: t }); setClientId(null); }} placeholder="Dott. Bianchi" testID="decl-client-name" />
-              <Field label="Studio / Clinica" value={client.clinic} onChangeText={(t) => setClient({ ...client, clinic: t })} placeholder="Studio Dentistico" testID="decl-client-clinic" />
-              <Field label="Indirizzo" value={client.address} onChangeText={(t) => setClient({ ...client, address: t })} placeholder="Via Roma 1, Milano" testID="decl-client-address" />
-              <Field label="Partita IVA" value={client.vat} onChangeText={(t) => setClient({ ...client, vat: t })} placeholder="IT01234567890" mono autoCapitalize="characters" testID="decl-client-vat" />
+              <Field label="Codice lavoro" value={codiceLavoro} onChangeText={setCodiceLavoro} placeholder="Automatico (es. 0023/2026)" mono autoCapitalize="characters" testID="decl-codice-lavoro" />
+              <Field label="Paziente (nome e cognome) *" value={patientName} onChangeText={setPatientName} placeholder="Es. Livesu Anna" autoCapitalize="words" testID="decl-patient-name" />
+              <Field label="Dispositivo identificato come *" value={deviceType} onChangeText={setDeviceType} placeholder="Es. PROTESI PROVVISORIA" autoCapitalize="characters" testID="decl-device-type" />
+              <Field label="Dettaglio dispositivo" value={deviceDescription} onChangeText={setDeviceDescription} placeholder="Es. PROVVISORIO AVVITATO" autoCapitalize="characters" testID="decl-device-description" />
             </>
           )}
 
           {step === 1 && (
             <>
               <AppText variant="bold" size={fontSize.xl} style={styles.stepTitle}>
-                Dispositivo protesico
+                Elementi dentali
               </AppText>
-              <Field label="Riferimento paziente" value={patientRef} onChangeText={setPatientRef} placeholder="Es. iniziali o codice (privacy)" testID="decl-patient-ref" />
-              <Field label="Tipo di dispositivo *" value={deviceType} onChangeText={setDeviceType} placeholder="Es. Corona in zirconia" testID="decl-device-type" />
-              <Field label="Descrizione dettagliata" value={deviceDescription} onChangeText={setDeviceDescription} placeholder="Elementi, materiali, colore, note tecniche…" multiline testID="decl-device-description" />
+              <AppText size={fontSize.base} color={colors.muted} style={{ marginBottom: spacing.md }}>
+                Tocca i denti interessati dal dispositivo (numerazione FDI).
+              </AppText>
+              <ToothChart selected={teeth} onChange={setTeeth} />
+              {teeth.length > 0 ? (
+                <AppText size={fontSize.sm} color={colors.brandPrimary} style={{ marginTop: spacing.md }}>
+                  Selezionati: {[...teeth].sort((a, b) => a - b).join(", ")}
+                </AppText>
+              ) : null}
             </>
           )}
 
           {step === 2 && (
             <>
               <AppText variant="bold" size={fontSize.xl} style={styles.stepTitle}>
-                Materiali impiegati
+                Prescrizione
               </AppText>
-              {libMaterials.length > 0 && (
+              <Field label="Codice prescrizione" value={prescriptionCode} onChangeText={setPrescriptionCode} placeholder="Es. 13LIO2AN23" mono autoCapitalize="characters" testID="decl-prescription-code" />
+              <Field label="Data prescrizione" value={prescriptionDate} onChangeText={setPrescriptionDate} placeholder="GG/MM/AAAA" testID="decl-prescription-date" />
+              <Field label="Prescrivente (odontoiatra)" value={prescriber} onChangeText={setPrescriber} placeholder="Es. Dott. Bianchi" testID="decl-prescriber" />
+
+              {clients.length > 0 && (
                 <>
                   <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.miniLabel}>
-                    AGGIUNGI DALL'ANAGRAFICA
+                    PRESCRIVENTE DALL'ANAGRAFICA
                   </AppText>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.libRow}>
-                    {libMaterials.map((m) => (
-                      <Pressable key={m.id} style={styles.libPill} onPress={() => addLibMaterial(m)} testID={`add-lib-material-${m.id}`}>
-                        <Ionicons name="add" size={16} color={colors.brandPrimary} />
+                    {clients.map((c) => (
+                      <Pressable key={c.id} style={styles.libPill} onPress={() => setPrescriber(c.name)} testID={`pick-prescriber-${c.id}`}>
+                        <Ionicons name="person" size={14} color={colors.brandPrimary} />
                         <AppText variant="medium" size={fontSize.base} color={colors.brandPrimary}>
-                          {m.name}
+                          {c.name}
                         </AppText>
                       </Pressable>
                     ))}
                   </ScrollView>
                 </>
+              )}
+
+              <AppText variant="bold" size={fontSize.lg} style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
+                Materiali impiegati
+              </AppText>
+              {libMaterials.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.libRow}>
+                  {libMaterials.map((m) => (
+                    <Pressable key={m.id} style={styles.libPill} onPress={() => addLibMaterial(m)} testID={`add-lib-material-${m.id}`}>
+                      <Ionicons name="add" size={16} color={colors.brandPrimary} />
+                      <AppText variant="medium" size={fontSize.base} color={colors.brandPrimary}>
+                        {m.name}
+                      </AppText>
+                    </Pressable>
+                  ))}
+                </ScrollView>
               )}
 
               {materials.length === 0 ? (
@@ -322,21 +310,26 @@ export default function NewDeclaration() {
           {step === 3 && (
             <>
               <AppText variant="bold" size={fontSize.xl} style={styles.stepTitle}>
-                Dichiarazioni di conformità
+                Etichetta e note
               </AppText>
-              <ToggleRow label="Conforme al Reg. (UE) 2017/745 (MDR)" value={conformity.mdr_2017_745} onToggle={(v) => setConformity({ ...conformity, mdr_2017_745: v })} testID="toggle-mdr" />
-              <ToggleRow label="Fabbricato su misura secondo prescrizione" value={conformity.made_to_prescription} onToggle={(v) => setConformity({ ...conformity, made_to_prescription: v })} testID="toggle-prescription" />
-              <ToggleRow label="Destinato al singolo paziente indicato" value={conformity.single_patient} onToggle={(v) => setConformity({ ...conformity, single_patient: v })} testID="toggle-single-patient" />
-              <ToggleRow label="Materiali biocompatibili e marcati CE" value={conformity.biocompatible} onToggle={(v) => setConformity({ ...conformity, biocompatible: v })} testID="toggle-biocompatible" />
+              <Field label="Data di consegna" value={deliveryDate} onChangeText={setDeliveryDate} placeholder="GG/MM/AAAA (default: oggi)" testID="decl-delivery-date" />
+              <Field label="Termini per l'utilizzo (giorni)" value={usageDays} onChangeText={setUsageDays} placeholder="30" keyboardType="number-pad" testID="decl-usage-days" />
+
+              <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.miniLabel}>
+                CONDIZIONI DI CONSERVAZIONE
+              </AppText>
+              <ToggleRow label="Non capovolgere la confezione" value={storage.no_flip} onToggle={(v) => setStorage({ ...storage, no_flip: v })} testID="toggle-no-flip" />
+              <ToggleRow label="Non sbattere l'involucro" value={storage.no_shake} onToggle={(v) => setStorage({ ...storage, no_shake: v })} testID="toggle-no-shake" />
+              <ToggleRow label="Conservare in luogo adeguato" value={storage.proper_place} onToggle={(v) => setStorage({ ...storage, proper_place: v })} testID="toggle-proper-place" />
+              <ToggleRow label="NON STERILE (non sterilizzare a caldo)" value={storage.non_sterile} onToggle={(v) => setStorage({ ...storage, non_sterile: v })} testID="toggle-non-sterile" />
+
               <View style={{ height: spacing.md }} />
-              <Field label="Riferimento normativo" value={normRef} onChangeText={setNormRef} placeholder={NORM_DEFAULT} multiline testID="decl-norm-ref" />
-              <Field label="Note aggiuntive" value={conformity.notes} onChangeText={(t) => setConformity({ ...conformity, notes: t })} placeholder="Eventuali note o avvertenze" multiline testID="decl-notes" />
+              <Field label="Annotazioni / eccezioni" value={annotations} onChangeText={setAnnotations} placeholder="Lascia vuoto per «Nessuna»" multiline testID="decl-annotations" />
             </>
           )}
         </KeyboardAwareScrollView>
       )}
 
-      {/* Bottom actions */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         {step === STEPS.length - 1 ? (
           <View style={{ gap: spacing.sm }}>
@@ -391,10 +384,7 @@ const styles = StyleSheet.create({
   body: { padding: spacing.xl, paddingBottom: spacing["3xl"] },
   signStep: { flex: 1, padding: spacing.xl },
   stepTitle: { marginBottom: spacing.lg },
-  miniLabel: { letterSpacing: 0.5, marginBottom: spacing.sm },
-  clientList: { gap: spacing.sm, marginBottom: spacing.xl },
-  clientCard: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md },
-  clientCardActive: { borderColor: colors.brandPrimary, backgroundColor: colors.brandTertiary },
+  miniLabel: { letterSpacing: 0.5, marginBottom: spacing.sm, marginTop: spacing.md },
   libRow: { gap: spacing.sm, paddingBottom: spacing.lg },
   libPill: {
     flexDirection: "row",

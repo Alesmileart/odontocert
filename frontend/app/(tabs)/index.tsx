@@ -14,7 +14,7 @@ const HERO =
   "https://images.unsplash.com/photo-1590424693420-634a0b0b782c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwyfHxkZW50YWwlMjBsYWJvcmF0b3J5JTIwbWFjcm8lMjBwcm9zdGhldGljfGVufDB8fHx8MTc4NTkyMjE3NXww&ixlib=rb-4.1.0&q=85";
 
 type Stats = { total: number; this_year: number; this_month: number; clients: number };
-type Decl = { id: string; number: string; patient_ref: string; device_type: string; issue_date: string; status: string; client_snapshot: { name?: string } };
+type Decl = { id: string; number: string; codice_lavoro?: string; patient_name?: string; patient_ref?: string; device_type: string; issue_date: string; status: string };
 
 function fmtDate(iso: string) {
   try {
@@ -161,7 +161,7 @@ export default function Dashboard() {
                 <Card style={styles.declCard}>
                   <View style={styles.declTop}>
                     <AppText variant="monoBold" size={fontSize.sm} color={colors.brandPrimary}>
-                      {d.number}
+                      {d.codice_lavoro || d.number}
                     </AppText>
                     <Badge status={d.status} />
                   </View>
@@ -171,7 +171,7 @@ export default function Dashboard() {
                   <View style={styles.declMeta}>
                     <Ionicons name="person-outline" size={14} color={colors.muted} />
                     <AppText size={fontSize.sm} color={colors.muted}>
-                      {d.client_snapshot?.name || "—"}
+                      {d.patient_name || d.patient_ref || "—"}
                     </AppText>
                     <AppText size={fontSize.sm} color={colors.muted}>
                       · {fmtDate(d.issue_date)}

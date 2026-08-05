@@ -11,7 +11,8 @@ import { exportDeclarationPdf, DeclarationData, LabProfile } from "@/src/utils/p
 import { colors, fontSize, spacing, radius } from "@/src/theme";
 
 function fmtDate(iso?: string) {
-  if (!iso) return "";
+  if (!iso) return "—";
+  if (iso.includes("/")) return iso;
   try {
     return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
   } catch {
@@ -90,13 +91,8 @@ export default function DeclarationDetail() {
     );
   }
 
-  const c = decl.conformity || {};
-  const items: { label: string; ok?: boolean }[] = [
-    { label: "Conforme al Reg. (UE) 2017/745", ok: c.mdr_2017_745 },
-    { label: "Fabbricato su misura secondo prescrizione", ok: c.made_to_prescription },
-    { label: "Destinato al singolo paziente", ok: c.single_patient },
-    { label: "Materiali biocompatibili e CE", ok: c.biocompatible },
-  ];
+  const deviceLine = [decl.device_type, decl.device_description].filter(Boolean).join(" >> ");
+  const teeth = [...(decl.teeth || [])].sort((a, b) => a - b);
 
   return (
     <View style={styles.container}>
@@ -105,7 +101,7 @@ export default function DeclarationDetail() {
           <Ionicons name="chevron-back" size={26} color={colors.onSurface} />
         </Pressable>
         <AppText variant="semibold" size={fontSize.base}>
-          Dichiarazione
+          Dichiarazione CE
         </AppText>
         <Pressable onPress={() => setConfirmDelete(true)} hitSlop={10} testID="detail-delete">
           <Ionicons name="trash-outline" size={22} color={colors.error} />
@@ -115,7 +111,7 @@ export default function DeclarationDetail() {
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <View style={styles.titleRow}>
           <AppText variant="monoBold" size={fontSize.lg} color={colors.brandPrimary}>
-            {decl.number}
+            Cod. {decl.codice_lavoro || decl.number}
           </AppText>
           <Badge status={decl.status} />
         </View>
@@ -124,18 +120,17 @@ export default function DeclarationDetail() {
         </AppText>
 
         <Card style={styles.section}>
-          <SectionTitle icon="person-outline" title="Committente" />
-          <Row k="Nome" v={decl.client_snapshot?.name} />
-          <Row k="Studio" v={decl.client_snapshot?.clinic} />
-          <Row k="Indirizzo" v={decl.client_snapshot?.address} />
-          <Row k="P.IVA" v={decl.client_snapshot?.vat} mono />
+          <SectionTitle icon="medkit-outline" title="Dispositivo" />
+          <Row k="Identificato come" v={deviceLine} />
+          <Row k="Paziente" v={decl.patient_name || decl.patient_ref} />
+          {teeth.length > 0 ? <Row k="Elementi" v={teeth.join(", ")} mono /> : null}
         </Card>
 
         <Card style={styles.section}>
-          <SectionTitle icon="medkit-outline" title="Dispositivo" />
-          <Row k="Rif. paziente" v={decl.patient_ref} />
-          <Row k="Tipo" v={decl.device_type} />
-          <Row k="Descrizione" v={decl.device_description} />
+          <SectionTitle icon="document-text-outline" title="Prescrizione" />
+          <Row k="Codice" v={decl.prescription_code} mono />
+          <Row k="Data" v={fmtDate(decl.prescription_date)} />
+          <Row k="Prescrivente" v={decl.prescriber} />
         </Card>
 
         <Card style={styles.section}>
@@ -159,41 +154,32 @@ export default function DeclarationDetail() {
         </Card>
 
         <Card style={styles.section}>
-          <SectionTitle icon="shield-checkmark-outline" title="Conformità" />
-          {items.map((it, i) => (
-            <View key={i} style={styles.confRow}>
-              <Ionicons
-                name={it.ok ? "checkmark-circle" : "close-circle"}
-                size={18}
-                color={it.ok ? colors.success : colors.muted}
-              />
-              <AppText size={fontSize.base} style={{ flex: 1 }}>
-                {it.label}
-              </AppText>
-            </View>
-          ))}
-          {c.notes ? (
+          <SectionTitle icon="pricetag-outline" title="Etichetta" />
+          <Row k="Consegna" v={fmtDate(decl.delivery_date) !== "—" ? fmtDate(decl.delivery_date) : fmtDate(decl.issue_date)} />
+          <Row k="Utilizzo" v={decl.usage_days ? `${decl.usage_days} giorni` : "—"} />
+          <Divider style={{ marginVertical: spacing.sm }} />
+          {decl.storage_no_flip ? <ConfLine label="Non capovolgere la confezione" /> : null}
+          {decl.storage_no_shake ? <ConfLine label="Non sbattere l'involucro" /> : null}
+          {decl.storage_proper_place ? <ConfLine label="Conservare in luogo adeguato" /> : null}
+          {decl.non_sterile ? <ConfLine label="NON STERILE (non sterilizzare a caldo)" /> : null}
+          {decl.annotations ? (
             <>
-              <Divider style={{ marginVertical: spacing.md }} />
+              <Divider style={{ marginVertical: spacing.sm }} />
               <AppText size={fontSize.sm} color={colors.muted}>
-                Note: {c.notes}
+                Annotazioni: {decl.annotations}
               </AppText>
             </>
           ) : null}
-          <Divider style={{ marginVertical: spacing.md }} />
-          <AppText size={fontSize.sm} color={colors.muted}>
-            {decl.norm_reference}
-          </AppText>
         </Card>
 
-        {decl.signature_base64 ? (
+        {decl.signature_base64 && decl.signature_base64.startsWith("data:") ? (
           <Card style={styles.section}>
             <SectionTitle icon="create-outline" title="Firma" />
             <View style={styles.sigBox}>
               <SignatureImage uri={decl.signature_base64} />
             </View>
             <AppText size={fontSize.sm} color={colors.muted} style={{ textAlign: "center" }}>
-              {decl.technician_name || lab.responsible_person || ""}
+              Il legale rappresentante · {decl.technician_name || lab.responsible_person || ""}
             </AppText>
           </Card>
         ) : null}
@@ -221,7 +207,7 @@ export default function DeclarationDetail() {
         }
       >
         <AppText size={fontSize.base} color={colors.onSurfaceSecondary}>
-          Sei sicuro di voler eliminare la dichiarazione {decl.number}? L'operazione non è reversibile.
+          Sei sicuro di voler eliminare questa dichiarazione? L'operazione non è reversibile.
         </AppText>
       </FormSheet>
     </View>
@@ -244,10 +230,21 @@ function SectionTitle({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; t
   );
 }
 
+function ConfLine({ label }: { label: string }) {
+  return (
+    <View style={styles.confRow}>
+      <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+      <AppText size={fontSize.base} style={{ flex: 1 }}>
+        {label}
+      </AppText>
+    </View>
+  );
+}
+
 function Row({ k, v, mono }: { k: string; v?: string; mono?: boolean }) {
   return (
     <View style={styles.row}>
-      <AppText size={fontSize.sm} color={colors.muted} style={{ width: 110 }}>
+      <AppText size={fontSize.sm} color={colors.muted} style={{ width: 120 }}>
         {k}
       </AppText>
       <AppText variant={mono ? "mono" : "regular"} size={fontSize.base} style={{ flex: 1 }}>
