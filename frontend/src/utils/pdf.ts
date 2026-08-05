@@ -31,6 +31,14 @@ export type DeclarationData = {
   non_sterile?: boolean;
   materials?: Material[];
   conformity?: Conformity;
+  client_snapshot?: {
+    name?: string;
+    clinic?: string;
+    address?: string;
+    vat?: string;
+    email?: string;
+    phone?: string;
+  };
 };
 
 export type LabProfile = {
@@ -265,6 +273,122 @@ export async function exportDeclarationPdf(d: DeclarationData, lab: LabProfile) 
     await Sharing.shareAsync(uri, {
       mimeType: "application/pdf",
       dialogTitle: "Condividi dichiarazione",
+      UTI: "com.adobe.pdf",
+    });
+  }
+  return uri;
+}
+
+
+/* =========================================================================
+ * PRESCRIZIONE — auto-compilata dai dati della dichiarazione di conformità
+ * (anagrafica cliente/studio, dati laboratorio, griglia denti con elementi
+ *  segnati). Stesso backend condiviso: usa gli stessi dati della dichiarazione.
+ * ========================================================================= */
+export function buildPrescriptionHtml(d: DeclarationData, lab: LabProfile): string {
+  const selected = new Set(d.teeth || []);
+  const client = d.client_snapshot || {};
+  const deviceLine = [d.device_type, d.device_description].filter(Boolean).join(" &gt;&gt; ");
+  const materialsList =
+    (d.materials || []).length > 0
+      ? `<div class="matlist">${(d.materials || [])
+          .map((m) => `<span class="matchip">${m.name}${m.ce_number ? ` · CE ${m.ce_number}` : ""}</span>`)
+          .join("")}</div>`
+      : `<div class="muted">—</div>`;
+
+  return `
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<style>
+  @page { size: A4 portrait; margin: 22px; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Times New Roman', Georgia, serif; color: #111; font-size: 12px; line-height: 1.5; }
+  .sheet { border: 1px solid #333; padding: 24px 28px; }
+  h1 { text-align: center; font-size: 17px; margin: 4px 0 18px; }
+  .grid { display: flex; gap: 16px; margin-bottom: 16px; }
+  .box { flex: 1; border: 1px solid #333; border-radius: 4px; padding: 12px; }
+  .box h3 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; background: #eee; padding: 3px 6px; }
+  .row { margin-bottom: 4px; }
+  .row .k { color: #555; display: inline-block; min-width: 78px; }
+  .strong { font-weight: bold; }
+  .kv { margin: 6px 0; }
+  .kv b { display: inline-block; min-width: 150px; }
+  .section-bar { background: #eee; border-top: 1px solid #333; border-bottom: 1px solid #333; text-align: center; font-weight: bold; padding: 3px; margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  table.teeth { border-collapse: collapse; margin: 12px auto; }
+  table.teeth td { text-align: center; }
+  table.teeth td.tnum { width: 24px; height: 14px; font-size: 9px; color: #111; border: none; padding: 1px 0; }
+  table.teeth td.tbox { width: 24px; height: 22px; border: 1px solid #111; font-size: 13px; font-weight: bold; line-height: 20px; }
+  table.teeth td.tspace { width: 12px; border: none; }
+  .matlist { margin-top: 4px; }
+  .matchip { display: inline-block; border: 1px solid #999; border-radius: 3px; padding: 1px 6px; margin: 2px 3px 2px 0; font-size: 10px; }
+  .muted { color: #777; }
+  .sign-area { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; }
+  .sig-label { border-top: 1px solid #111; text-align: center; padding-top: 4px; width: 240px; font-style: italic; }
+</style>
+</head>
+<body>
+  <div class="sheet">
+    <h1>Prescrizione Odontoiatrica</h1>
+
+    <div class="grid">
+      <div class="box">
+        <h3>Studio / Odontoiatra (prescrivente)</h3>
+        <div class="row"><span class="k">Nome:</span> <span class="strong">${client.name || d.prescriber || "—"}</span></div>
+        <div class="row"><span class="k">Studio:</span> ${client.clinic || "—"}</div>
+        <div class="row"><span class="k">Indirizzo:</span> ${client.address || "—"}</div>
+        <div class="row"><span class="k">P.IVA:</span> ${client.vat || "—"}</div>
+        <div class="row"><span class="k">Contatti:</span> ${[client.phone, client.email].filter(Boolean).join(" · ") || "—"}</div>
+      </div>
+      <div class="box">
+        <h3>Laboratorio destinatario</h3>
+        <div class="row"><span class="strong">${lab.lab_name || "—"}</span></div>
+        <div class="row">${lab.address || ""} ${lab.city ? "· " + lab.city : ""}</div>
+        <div class="row">${lab.registration_number ? "Reg. Min. Sal.: " + lab.registration_number : ""}</div>
+        <div class="row">${lab.reg_imprese ? "Reg. Imprese: " + lab.reg_imprese : ""}</div>
+        <div class="row">${[lab.phone, lab.email].filter(Boolean).join(" · ")}</div>
+      </div>
+    </div>
+
+    <div class="kv"><b>Codice lavoro:</b> <span class="strong">${d.codice_lavoro || d.number || "—"}</span></div>
+    <div class="kv"><b>Data prescrizione:</b> ${fmtDate(d.prescription_date) || fmtDate(d.issue_date)}${
+    d.prescription_code ? ` &nbsp;·&nbsp; <b>Codice:</b> ${d.prescription_code}` : ""
+  }</div>
+    <div class="kv"><b>Paziente:</b> <span class="strong">${d.patient_name || d.patient_ref || "—"}</span></div>
+
+    <div class="section-bar">Elementi dentali interessati</div>
+    <table class="teeth">
+      ${toothCells(UPPER_TEETH, selected, true)}
+      ${toothCells(LOWER_TEETH, selected, false)}
+    </table>
+
+    <div class="section-bar">Dispositivo richiesto</div>
+    <div class="strong" style="margin:4px 0">${deviceLine || "—"}</div>
+
+    <div class="section-bar">Materiali / indicazioni</div>
+    ${materialsList}
+
+    <div class="sign-area">
+      <div>Data, ${fmtDate(d.prescription_date) || fmtDate(d.issue_date)}</div>
+      <div style="text-align:center">
+        <div style="height:40px"></div>
+        <div class="sig-label">Il prescrivente<br/>${client.name || d.prescriber || ""}</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+export async function exportPrescriptionPdf(d: DeclarationData, lab: LabProfile) {
+  const html = buildPrescriptionHtml(d, lab);
+  const { uri } = await Print.printToFileAsync({ html, base64: false, width: 595, height: 842 });
+  const canShare = await Sharing.isAvailableAsync();
+  if (canShare) {
+    await Sharing.shareAsync(uri, {
+      mimeType: "application/pdf",
+      dialogTitle: "Condividi prescrizione",
       UTI: "com.adobe.pdf",
     });
   }

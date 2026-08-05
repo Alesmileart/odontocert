@@ -42,6 +42,7 @@ export default function NewDeclaration() {
   const [prescriptionCode, setPrescriptionCode] = useState("");
   const [prescriptionDate, setPrescriptionDate] = useState("");
   const [prescriber, setPrescriber] = useState("");
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [materials, setMaterials] = useState<DeclMaterial[]>([]);
   // Step 4 — Etichetta & note
   const [deliveryDate, setDeliveryDate] = useState("");
@@ -109,7 +110,17 @@ export default function NewDeclaration() {
   };
 
   const buildPayload = (signature: string) => ({
-    client_snapshot: {},
+    client_id: selectedClient?.id ?? null,
+    client_snapshot: selectedClient
+      ? {
+          name: selectedClient.name,
+          clinic: selectedClient.clinic,
+          address: selectedClient.address,
+          vat: selectedClient.vat,
+          email: selectedClient.email,
+          phone: selectedClient.phone,
+        }
+      : { name: prescriber },
     codice_lavoro: codiceLavoro,
     patient_name: patientName,
     patient_ref: patientName,
@@ -240,14 +251,25 @@ export default function NewDeclaration() {
                     PRESCRIVENTE DALL'ANAGRAFICA
                   </AppText>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.libRow}>
-                    {clients.map((c) => (
-                      <Pressable key={c.id} style={styles.libPill} onPress={() => setPrescriber(c.name)} testID={`pick-prescriber-${c.id}`}>
-                        <Ionicons name="person" size={14} color={colors.brandPrimary} />
-                        <AppText variant="medium" size={fontSize.base} color={colors.brandPrimary}>
-                          {c.name}
-                        </AppText>
-                      </Pressable>
-                    ))}
+                    {clients.map((c) => {
+                      const active = selectedClient?.id === c.id;
+                      return (
+                        <Pressable
+                          key={c.id}
+                          style={[styles.libPill, active && styles.libPillActive]}
+                          onPress={() => {
+                            setSelectedClient(c);
+                            setPrescriber(c.name);
+                          }}
+                          testID={`pick-prescriber-${c.id}`}
+                        >
+                          <Ionicons name="person" size={14} color={active ? colors.onBrandPrimary : colors.brandPrimary} />
+                          <AppText variant="medium" size={fontSize.base} color={active ? colors.onBrandPrimary : colors.brandPrimary}>
+                            {c.name}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })}
                   </ScrollView>
                 </>
               )}
@@ -396,6 +418,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     flexShrink: 0,
   },
+  libPillActive: { backgroundColor: colors.brandPrimary },
   matEmpty: { alignItems: "center", paddingVertical: spacing.xl },
   matList: { gap: spacing.md },
   matCard: { padding: spacing.lg },

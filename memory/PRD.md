@@ -23,21 +23,25 @@
 - [x] JWT auth: signup/login/me, secure token storage.
 - [x] Lab profile auto-fill (GET/PUT /api/profile) + Reg. Min. Salute, Reg. Imprese, dicitura autorizzazione.
 - [x] Clients & Materials library CRUD with bottom-sheet editor.
-- [x] Declaration wizard restructured to classic Italian format: Lavoro/Paziente → Arcata (schema denti FDI) → Prescrizione/Materiali → Etichetta/Note → Firma.
-- [x] Dental tooth chart selector (FDI 18-28 / 48-38) with ☒ marking.
-- [x] PDF layout faithful to the standard "Dichiarazione di conformità alle normative CE": intestazione Ministero della Salute + logo lab, blocco fabbricante, testo Direttiva 93/42/CEE, codice lavoro, schema dentale, prescrizione, PROTOCOLLO DI FABBRICAZIONE, MATERIALI UTILIZZATI, annotazioni, firma "Il legale rappresentante", ETICHETTA staccabile (consegna, giorni, condizioni conservazione, NON STERILE).
-- [x] Auto codice lavoro NNNN/YYYY, draft vs issued status.
-- [x] Signature capture pad + PDF share.
-- [x] Dashboard stats + recent list, Archive search/filter chips.
-- [x] Verified: backend curl (new format), wizard steps, tooth chart, PDF rendering screenshot.
+- [x] Declaration wizard classic Italian format: Lavoro/Paziente → Arcata (schema denti FDI) → Prescrizione/Materiali → Etichetta/Note → Firma; client anagrafica (client_id + snapshot) salvata sulla dichiarazione.
+- [x] Dental tooth chart selector + PDF grid con caselle bordate, spazio centrale e ✕ sugli elementi selezionati.
+- [x] PDF Dichiarazione di conformità (A4 verticale) fedele al documento originale.
+- [x] **Modulo Prescrizione**: PDF prescrizione odontoiatrica auto-compilato dai dati della dichiarazione (anagrafica studio/cliente + dati laboratorio + griglia denti con elementi segnati + dispositivo + materiali + firma prescrivente). Pulsante dedicato nel dettaglio dichiarazione.
+- [x] Auto codice lavoro NNNN/YYYY, draft vs issued.
+- [x] Signature capture + PDF share (dichiarazione e prescrizione).
+- [x] Dashboard stats + recent, Archive search/filter chips.
+
+## Architettura backend condiviso (predisposizione)
+- Backend unico FastAPI + MongoDB con API REST per user/profile/clients/materials/declarations, riutilizzabili da futuri frontend (web magazzino, fatturazione).
+- Dati anagrafica cliente e materiali centralizzati e già richiamati dalla dichiarazione → pronti per moduli magazzino/fatturazione.
 
 ## Backlog (prioritized)
-- P1: Logo laboratorio upload nel profilo (già supportato nel PDF, manca UI upload immagine).
-- P1: Duplica dichiarazione / usa come modello.
-- P1: Date picker per data prescrizione/consegna (ora testo GG/MM/AAAA).
+- P1: Logo laboratorio upload (già supportato nel PDF, manca UI upload).
+- P1: Date picker per prescrizione/consegna.
+- P2: Modulo magazzino (giacenze materiali + scarico automatico da dichiarazione) sullo stesso backend.
+- P2: Modulo fatturazione elettronica (integrazione SDI via provider accreditato).
 - P2: Toggle Direttiva 93/42/CEE vs Regolamento UE 2017/745 (MDR).
-- P2: Filtro archivio per prescrivente e per data range.
-- P2: Barcode/QR sul PDF come nell'originale.
+- P2: Barcode/QR sul PDF.
 
 ## Next Tasks
 - Await user feedback; prioritize logo upload and PDF branding.

@@ -7,7 +7,7 @@ import { AppText, Card, Badge, Button, Divider } from "@/src/components/ui";
 import { FormSheet } from "@/src/components/FormSheet";
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/components/Toast";
-import { exportDeclarationPdf, DeclarationData, LabProfile } from "@/src/utils/pdf";
+import { exportDeclarationPdf, exportPrescriptionPdf, DeclarationData, LabProfile } from "@/src/utils/pdf";
 import { colors, fontSize, spacing, radius } from "@/src/theme";
 
 function fmtDate(iso?: string) {
@@ -29,6 +29,7 @@ export default function DeclarationDetail() {
   const [lab, setLab] = useState<LabProfile>({});
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [exportingPresc, setExportingPresc] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const load = useCallback(async () => {
@@ -61,6 +62,18 @@ export default function DeclarationDetail() {
       toast.show(e instanceof Error ? e.message : "Errore esportazione PDF", "error");
     } finally {
       setExporting(false);
+    }
+  };
+
+  const onExportPrescription = async () => {
+    if (!decl) return;
+    setExportingPresc(true);
+    try {
+      await exportPrescriptionPdf(decl, lab);
+    } catch (e) {
+      toast.show(e instanceof Error ? e.message : "Errore esportazione prescrizione", "error");
+    } finally {
+      setExportingPresc(false);
     }
   };
 
@@ -118,6 +131,14 @@ export default function DeclarationDetail() {
         <AppText size={fontSize.sm} color={colors.muted} style={{ marginBottom: spacing.lg }}>
           Emessa il {fmtDate(decl.issue_date)}
         </AppText>
+
+        <Card style={styles.section}>
+          <SectionTitle icon="business-outline" title="Committente / Studio" />
+          <Row k="Odontoiatra" v={decl.client_snapshot?.name || decl.prescriber} />
+          <Row k="Studio" v={decl.client_snapshot?.clinic} />
+          <Row k="Indirizzo" v={decl.client_snapshot?.address} />
+          <Row k="P.IVA" v={decl.client_snapshot?.vat} mono />
+        </Card>
 
         <Card style={styles.section}>
           <SectionTitle icon="medkit-outline" title="Dispositivo" />
@@ -186,13 +207,25 @@ export default function DeclarationDetail() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <Button
-          title="Esporta / Condividi PDF"
-          onPress={onExport}
-          loading={exporting}
-          icon={<Ionicons name="share-outline" size={20} color={colors.onBrandPrimary} />}
-          testID="export-pdf-button"
-        />
+        <View style={styles.footerRow}>
+          <Button
+            title="Dichiarazione"
+            onPress={onExport}
+            loading={exporting}
+            icon={<Ionicons name="document-text-outline" size={18} color={colors.onBrandPrimary} />}
+            style={styles.footerBtn}
+            testID="export-pdf-button"
+          />
+          <Button
+            title="Prescrizione"
+            kind="secondary"
+            onPress={onExportPrescription}
+            loading={exportingPresc}
+            icon={<Ionicons name="clipboard-outline" size={18} color={colors.brandPrimary} />}
+            style={styles.footerBtn}
+            testID="export-prescription-button"
+          />
+        </View>
       </View>
 
       <FormSheet
@@ -289,4 +322,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.surfaceSecondary,
   },
+  footerRow: { flexDirection: "row", gap: spacing.sm },
+  footerBtn: { flex: 1 },
 });
