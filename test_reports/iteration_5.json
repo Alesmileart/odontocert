@@ -1,0 +1,25 @@
+{
+  "summary": "Frontend-only test delle due nuove feature richieste (DUPLICA DICHIARAZIONE + FILTRI/RICERCA ARCHIVIO). Login con tecnico@lab.it/password123, viewport mobile 390x844. Tutti i flussi funzionano correttamente end-to-end: (1) Ricerca 'protesi' filtra da 3 a 1 item. (2) FormSheet Filtri: chip 'prescriber-all' + 2 chip specifiche ('Dott. Bianchi', 'Test') rese; DateField dentro il FormSheet si apre correttamente (cal-today/cal-prev/cal-day-1 visibili e cliccabili — il Modal annidato NON è bloccato); selezione data-from + prescriber 'Dott. Bianchi' riduce la lista da 3 a 2 e il badge sul pulsante open-filters mostra '2'. (3) reset-filters riporta la lista a 3 item e il badge scompare. (4) Duplica: tap su detail-duplicate apre /declaration/new?from=<id> con header 'Duplica dichiarazione'; step 1 precompilato con patient='Livesu Anna', device='PROTESI PROVVISORIA', desc='PROVVISORIO AVVITATO', codice_lavoro VUOTO (automatico), step 3 con prescription_code='13LIO2AN23' e prescriber='Dott. Bianchi', step 5 technician-name vuoto e firma vuota come da spec. (5) save-draft-button crea NUOVA dichiarazione con id differente (source=3effef8d... → new=eafacefb...) e nuovo codice_lavoro 0004/2026 con status Bozza; il detail della nuova dichiarazione mostra tutti i dati copiati (paziente, dispositivo, prescrizione, denti 31/41, materiale Zirconia LOT L1) senza sovrascrivere l'originale.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "archive.tsx: activeFilterCount conta dateFrom e dateTo come 2 filtri separati anche se semanticamente sono un unico filtro 'periodo'. Selezionando entrambe le date il badge mostra 3 (prescriber+from+to). Considerare di contarli come 1 se almeno uno dei due è settato per una UX più intuitiva.",
+    "new.tsx load(): la precompilazione da 'from' avviene dentro il callback usato in useFocusEffect. Se l'utente torna al wizard con back-navigation, prefilled.current=true impedisce un ri-fetch ma i field già editati non vengono resettati (comportamento corretto ma non ovvio). Va bene.",
+    "new.tsx: precompila anche technician_name dalla dichiarazione sorgente. Il review request dice 'la firma NON deve essere precompilata' (rispettato — signature_base64 non è copiato) ma non è chiaro se anche il nome del firmatario dovrebbe restare vuoto. Attualmente viene copiato — se la sorgente ha technician_name valorizzato, verrà mostrato a step 5. Valutare se lasciarlo vuoto per forzare l'utente a riconfermare il firmatario nella nuova dichiarazione.",
+    "archive.tsx searchBar placeholder: 'Cerca per numero, cliente, dispositivo…' ma la ricerca include anche il prescrivente e il paziente. Il placeholder potrebbe menzionarli (o essere abbreviato in 'Cerca…').",
+    "DateField.tsx: il Modal annidato dentro un altro Modal (FormSheet→DateField) funziona bene su web preview, ma su iOS reale i Modal annidati possono avere problemi di stack. Verificare in build nativo che il calendario si apra sopra il FormSheet."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (non richiesto)", "frontend": "100%" },
+  "seed_data_creation": "Nessuna seed manuale. Test eseguiti sui dati esistenti dell'account tecnico@lab.it (3 dichiarazioni in archivio, prescriventi: Dott. Bianchi, Test). Durante il test è stata creata una nuova dichiarazione duplicata come bozza (Cod. 0004/2026 id eafacefb-ad32-4afc-9488-2ba825c2d33f) che ora è presente nell'archivio.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login: tecnico@lab.it / password123. Archivio a `/archive` tab: testID archive-search-input (ricerca live), open-filters (apre FormSheet), filter-chip-{all|issued|draft} (chip stato). Nel FormSheet: prescriber-all + prescriber-<nome esatto> (spazi/punti inclusi, es. 'prescriber-Dott. Bianchi'), filter-date-from/filter-date-to (aprono calendario annidato con cal-today/cal-prev/cal-next/cal-day-<n>/cal-clear), apply-filters, reset-filters (visibile solo se activeFilterCount>0). Duplica: dal detail (`/declaration/<id>`) tap su detail-duplicate → /declaration/new?from=<id>. Prefill via useRef(prefilled) idempotente. Save-draft su step 5 con signature_base64='' crea nuova entry. NB: la ricerca ha 3 item seed + eventuali duplicati creati; se serve pulizia usare detail-delete → confirm-delete-button. NB #2: se il test viene rilanciato subito senza attendere il load, gli items non sono ancora presenti nel FlatList — aspettare in polling per '[data-testid^=\"archive-item-\"]' fino a 10s."
+}

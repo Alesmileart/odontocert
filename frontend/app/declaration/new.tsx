@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState } from "react";
 import { View, StyleSheet, Pressable, ScrollView } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { AppText, Button, Card } from "@/src/components/ui";
 import { Field } from "@/src/components/Field";
@@ -26,6 +26,8 @@ export default function NewDeclaration() {
   const router = useRouter();
   const toast = useToast();
   const sigRef = useRef<SignaturePadRef>(null);
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  const prefilled = useRef(false);
 
   const [step, setStep] = useState(0);
   const [clients, setClients] = useState<Client[]>([]);
@@ -64,7 +66,52 @@ export default function NewDeclaration() {
     } catch {
       /* empty */
     }
-  }, []);
+    // Precompila da una dichiarazione esistente (duplica)
+    if (from && !prefilled.current) {
+      prefilled.current = true;
+      try {
+        const src = await api.get<any>(`/declarations/${from}`);
+        setPatientName(src.patient_name || src.patient_ref || "");
+        setDeviceType(src.device_type || "");
+        setDeviceDescription(src.device_description || "");
+        setTeeth(Array.isArray(src.teeth) ? src.teeth : []);
+        setPrescriptionCode(src.prescription_code || "");
+        setPrescriber(src.prescriber || src.client_snapshot?.name || "");
+        setMaterials(
+          (src.materials || []).map((mm: any) => ({
+            name: mm.name || "",
+            manufacturer: mm.manufacturer || "",
+            ce_number: mm.ce_number || "",
+            lot: mm.lot || "",
+            category: mm.category || "",
+          }))
+        );
+        setUsageDays(src.usage_days || "30");
+        setStorage({
+          no_flip: src.storage_no_flip ?? true,
+          no_shake: src.storage_no_shake ?? true,
+          proper_place: src.storage_proper_place ?? true,
+          non_sterile: src.non_sterile ?? true,
+        });
+        setAnnotations(src.annotations || "");
+        setTechnicianName(src.technician_name || "");
+        if (src.client_id || src.client_snapshot?.name) {
+          setSelectedClient({
+            id: src.client_id || "",
+            name: src.client_snapshot?.name || "",
+            clinic: src.client_snapshot?.clinic || "",
+            address: src.client_snapshot?.address || "",
+            vat: src.client_snapshot?.vat || "",
+            email: src.client_snapshot?.email || "",
+            phone: src.client_snapshot?.phone || "",
+          });
+        }
+        toast.show("Dati copiati — modifica paziente e lotti", "info");
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [from, toast]);
 
   useFocusEffect(
     useCallback(() => {
@@ -167,7 +214,7 @@ export default function NewDeclaration() {
           </Pressable>
           <View style={{ alignItems: "center" }}>
             <AppText variant="semibold" size={fontSize.base}>
-              Nuova dichiarazione
+              {from ? "Duplica dichiarazione" : "Nuova dichiarazione"}
             </AppText>
             <AppText size={fontSize.sm} color={colors.muted}>
               {step + 1}/{STEPS.length} · {STEPS[step]}

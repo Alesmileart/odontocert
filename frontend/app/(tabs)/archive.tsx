@@ -4,9 +4,15 @@ import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { AppText, Card, Badge } from "@/src/components/ui";
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+import { AppText, Card, Badge, Button } from "@/src/components/ui";
+import { FormSheet } from "@/src/components/FormSheet";
+import { DateField } from "@/src/components/DateField";
 import { api } from "@/src/api/client";
 import { colors, fontSize, spacing, radius } from "@/src/theme";
+
+dayjs.extend(customParseFormat);
 
 const EMPTY_IMG =
   "https://images.unsplash.com/photo-1651760680066-db9d32bd0357?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwxfHxlbXB0eSUyMGNsaXBib2FyZCUyMGNsZWFuJTIwbWluaW1hbHxlbnwwfHx8fDE3ODU5MjIxNzV8MA&ixlib=rb-4.1.0&q=85";
@@ -17,10 +23,16 @@ type Decl = {
   codice_lavoro?: string;
   patient_name?: string;
   patient_ref?: string;
+  prescriber?: string;
+  client_snapshot?: { name?: string };
   device_type: string;
   issue_date: string;
   status: string;
 };
+
+function prescriberOf(d: Decl) {
+  return (d.client_snapshot?.name || d.prescriber || "").trim();
+}
 
 const FILTERS = [
   { key: "all", label: "Tutte" },
@@ -43,6 +55,10 @@ export default function Archive() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
+  const [filterSheet, setFilterSheet] = useState(false);
+  const [prescriberFilter, setPrescriberFilter] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -61,19 +77,49 @@ export default function Archive() {
     }, [load])
   );
 
+  const prescriberOptions = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((d) => {
+      const p = prescriberOf(d);
+      if (p) set.add(p);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [items]);
+
+  const activeFilterCount =
+    (prescriberFilter ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
+
+  const resetFilters = () => {
+    setPrescriberFilter(null);
+    setDateFrom("");
+    setDateTo("");
+  };
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const from = dateFrom ? dayjs(dateFrom, "DD/MM/YYYY", true) : null;
+    const to = dateTo ? dayjs(dateTo, "DD/MM/YYYY", true) : null;
     return items.filter((d) => {
       if (filter !== "all" && d.status !== filter) return false;
+      if (prescriberFilter && prescriberOf(d) !== prescriberFilter) return false;
+      if (from && from.isValid()) {
+        const iss = dayjs(d.issue_date);
+        if (iss.isValid() && iss.isBefore(from.startOf("day"))) return false;
+      }
+      if (to && to.isValid()) {
+        const iss = dayjs(d.issue_date);
+        if (iss.isValid() && iss.isAfter(to.endOf("day"))) return false;
+      }
       if (!q) return true;
       return (
         d.number.toLowerCase().includes(q) ||
         (d.codice_lavoro || "").toLowerCase().includes(q) ||
         (d.device_type || "").toLowerCase().includes(q) ||
-        (d.patient_name || d.patient_ref || "").toLowerCase().includes(q)
+        (d.patient_name || d.patient_ref || "").toLowerCase().includes(q) ||
+        prescriberOf(d).toLowerCase().includes(q)
       );
     });
-  }, [items, query, filter]);
+  }, [items, query, filter, prescriberFilter, dateFrom, dateTo]);
 
   return (
     <View style={styles.container}>
@@ -82,21 +128,33 @@ export default function Archive() {
         <AppText variant="bold" size={fontSize["2xl"]} style={styles.headerTitle}>
           Archivio
         </AppText>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color={colors.muted} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Cerca per numero, cliente, dispositivo…"
-            placeholderTextColor={colors.muted}
-            style={styles.searchInput}
-            testID="archive-search-input"
-          />
-          {query ? (
-            <Pressable onPress={() => setQuery("")} hitSlop={8} testID="clear-search">
-              <Ionicons name="close-circle" size={18} color={colors.muted} />
-            </Pressable>
-          ) : null}
+        <View style={styles.searchRow}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={18} color={colors.muted} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Cerca per numero, cliente, dispositivo…"
+              placeholderTextColor={colors.muted}
+              style={styles.searchInput}
+              testID="archive-search-input"
+            />
+            {query ? (
+              <Pressable onPress={() => setQuery("")} hitSlop={8} testID="clear-search">
+                <Ionicons name="close-circle" size={18} color={colors.muted} />
+              </Pressable>
+            ) : null}
+          </View>
+          <Pressable style={styles.filterBtn} onPress={() => setFilterSheet(true)} testID="open-filters">
+            <Ionicons name="options-outline" size={20} color={activeFilterCount ? colors.onBrandPrimary : colors.brandPrimary} />
+            {activeFilterCount ? (
+              <View style={styles.filterBadge}>
+                <AppText variant="bold" size={10} color={colors.onBrandPrimary}>
+                  {activeFilterCount}
+                </AppText>
+              </View>
+            ) : null}
+          </Pressable>
         </View>
         <ScrollView
           horizontal
@@ -172,6 +230,68 @@ export default function Archive() {
           )}
         />
       )}
+
+      <FormSheet
+        visible={filterSheet}
+        title="Filtri"
+        onClose={() => setFilterSheet(false)}
+        footer={
+          <View style={{ gap: spacing.sm }}>
+            <Button title="Applica" onPress={() => setFilterSheet(false)} testID="apply-filters" />
+            {activeFilterCount ? (
+              <Button title="Azzera filtri" kind="secondary" onPress={resetFilters} testID="reset-filters" />
+            ) : null}
+          </View>
+        }
+      >
+        <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.filterLabel}>
+          PRESCRIVENTE
+        </AppText>
+        <View style={styles.prescriberWrap}>
+          <Pressable
+            style={[styles.presChip, !prescriberFilter && styles.presChipActive]}
+            onPress={() => setPrescriberFilter(null)}
+            testID="prescriber-all"
+          >
+            <AppText variant={!prescriberFilter ? "semibold" : "medium"} size={fontSize.base} color={!prescriberFilter ? colors.onBrandPrimary : colors.onSurfaceSecondary}>
+              Tutti
+            </AppText>
+          </Pressable>
+          {prescriberOptions.map((p) => {
+            const active = prescriberFilter === p;
+            return (
+              <Pressable
+                key={p}
+                style={[styles.presChip, active && styles.presChipActive]}
+                onPress={() => setPrescriberFilter(active ? null : p)}
+                testID={`prescriber-${p}`}
+              >
+                <AppText variant={active ? "semibold" : "medium"} size={fontSize.base} color={active ? colors.onBrandPrimary : colors.onSurfaceSecondary}>
+                  {p}
+                </AppText>
+              </Pressable>
+            );
+          })}
+          {prescriberOptions.length === 0 ? (
+            <AppText size={fontSize.sm} color={colors.muted}>
+              Nessun prescrivente disponibile
+            </AppText>
+          ) : null}
+        </View>
+
+        <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.filterLabel}>
+          PERIODO (DATA DI EMISSIONE)
+        </AppText>
+        <View style={styles.dateRow}>
+          <View style={{ flex: 1 }}>
+            <DateField label="Dal" value={dateFrom} onChange={setDateFrom} testID="filter-date-from" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <DateField label="Al" value={dateTo} onChange={setDateTo} testID="filter-date-to" />
+          </View>
+        </View>
+        <View style={{ height: spacing.lg }} />
+      </FormSheet>
     </View>
   );
 }
@@ -185,16 +305,51 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   headerTitle: { paddingHorizontal: spacing.xl, marginBottom: spacing.md },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.xl },
   searchBar: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    marginHorizontal: spacing.xl,
     backgroundColor: colors.surfaceTertiary,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     height: 44,
   },
+  filterBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceTertiary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: colors.brandPrimary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterLabel: { letterSpacing: 0.5, marginBottom: spacing.sm, marginTop: spacing.sm },
+  prescriberWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.md },
+  presChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceTertiary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  presChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
+  dateRow: { flexDirection: "row", gap: spacing.md },
   searchInput: { flex: 1, fontSize: fontSize.base, color: colors.onSurface, fontFamily: "PlusJakartaSans-Regular" },
   chipsRow: { paddingHorizontal: spacing.xl, gap: spacing.sm, paddingTop: spacing.md },
   chip: {

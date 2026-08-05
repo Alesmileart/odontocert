@@ -125,9 +125,14 @@ export default function DeclarationDetail() {
         <AppText variant="semibold" size={fontSize.base}>
           Dichiarazione CE
         </AppText>
-        <Pressable onPress={() => setConfirmDelete(true)} hitSlop={10} testID="detail-delete">
-          <Ionicons name="trash-outline" size={22} color={colors.error} />
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: spacing.lg }}>
+          <Pressable onPress={() => router.push(`/declaration/new?from=${id}`)} hitSlop={10} testID="detail-duplicate">
+            <Ionicons name="copy-outline" size={22} color={colors.brandPrimary} />
+          </Pressable>
+          <Pressable onPress={() => setConfirmDelete(true)} hitSlop={10} testID="detail-delete">
+            <Ionicons name="trash-outline" size={22} color={colors.error} />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
