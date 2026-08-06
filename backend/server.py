@@ -434,6 +434,154 @@ async def delete_protocol(protocol_id: str, user: dict = Depends(get_current_use
     return {"ok": True}
 
 
+# ----------------------- Listino & Fatturazione -----------------------
+class PriceItem(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    price: float = 0
+    mode: str = "flat"        # flat (forfait) | per_element (per elemento/dente)
+    category: str = ""
+    description: str = ""
+
+
+class PriceItemInput(BaseModel):
+    name: str
+    price: float = 0
+    mode: str = "flat"
+    category: str = ""
+    description: str = ""
+
+
+class InvoiceLine(BaseModel):
+    description: str = ""
+    qty: float = 1
+    unit_price: float = 0
+    mode: str = "flat"
+    declaration_id: str = ""
+
+
+class InvoiceInput(BaseModel):
+    client_id: Optional[str] = None
+    client_snapshot: dict = {}
+    date: str = ""
+    lines: List[InvoiceLine] = []
+    declaration_ids: List[str] = []
+    exemption_text: str = "Operazione esente IVA ai sensi dell'art. 10, n. 18, D.P.R. 633/1972"
+    bollo: bool = False
+    bollo_amount: float = 2.0
+    notes: str = ""
+    status: str = "issued"    # draft | issued
+
+
+def invoice_total(payload: dict) -> float:
+    subtotal = sum((l.get("qty") or 0) * (l.get("unit_price") or 0) for l in payload.get("lines", []))
+    if payload.get("bollo"):
+        subtotal += payload.get("bollo_amount") or 0
+    return round(subtotal, 2)
+
+
+# ----------------------- Listino (price list) routes -----------------------
+@api_router.get("/price-items", response_model=List[PriceItem])
+async def list_price_items(user: dict = Depends(get_current_user)):
+    docs = await db.price_items.find({"user_id": user["id"]}).sort("name", 1).to_list(1000)
+    return [PriceItem(**{k: v for k in PriceItem.model_fields.keys() if (v := d.get(k)) is not None}) for d in docs]
+
+
+@api_router.post("/price-items", response_model=PriceItem, status_code=201)
+async def create_price_item(data: PriceItemInput, user: dict = Depends(get_current_user)):
+    obj = PriceItem(**data.dict())
+    await db.price_items.insert_one({**obj.dict(), "user_id": user["id"], "created_at": now_iso()})
+    return obj
+
+
+@api_router.put("/price-items/{item_id}", response_model=PriceItem)
+async def update_price_item(item_id: str, data: PriceItemInput, user: dict = Depends(get_current_user)):
+    doc = await db.price_items.find_one({"id": item_id, "user_id": user["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Voce di listino non trovata")
+    await db.price_items.update_one({"id": item_id, "user_id": user["id"]}, {"$set": data.dict()})
+    return PriceItem(id=item_id, **data.dict())
+
+
+@api_router.delete("/price-items/{item_id}")
+async def delete_price_item(item_id: str, user: dict = Depends(get_current_user)):
+    await db.price_items.delete_one({"id": item_id, "user_id": user["id"]})
+    return {"ok": True}
+
+
+# ----------------------- Fatture (invoices) routes -----------------------
+async def next_invoice_number(user_id: str) -> str:
+    year = datetime.now(timezone.utc).year
+    count = await db.invoices.count_documents({"user_id": user_id, "year": year})
+    return f"FT-{year}-{count + 1:04d}"
+
+
+@api_router.get("/invoices")
+async def list_invoices(user: dict = Depends(get_current_user)):
+    docs = await db.invoices.find({"user_id": user["id"]}).sort("created_at", -1).to_list(1000)
+    result = []
+    for d in docs:
+        d = clean(d)
+        d.pop("user_id", None)
+        d.pop("year", None)
+        result.append(d)
+    return result
+
+
+@api_router.get("/invoices/{invoice_id}")
+async def get_invoice(invoice_id: str, user: dict = Depends(get_current_user)):
+    doc = await db.invoices.find_one({"id": invoice_id, "user_id": user["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Fattura non trovata")
+    doc = clean(doc)
+    doc.pop("user_id", None)
+    doc.pop("year", None)
+    return doc
+
+
+@api_router.post("/invoices", status_code=201)
+async def create_invoice(data: InvoiceInput, user: dict = Depends(get_current_user)):
+    year = datetime.now(timezone.utc).year
+    number = await next_invoice_number(user["id"])
+    payload = data.dict()
+    doc = {
+        "id": str(uuid.uuid4()),
+        "number": number,
+        "year": year,
+        "user_id": user["id"],
+        **payload,
+        "total": invoice_total(payload),
+        "created_at": now_iso(),
+        "date": data.date or now_iso(),
+    }
+    await db.invoices.insert_one(dict(doc))
+    out = clean(doc)
+    out.pop("user_id", None)
+    out.pop("year", None)
+    return out
+
+
+@api_router.put("/invoices/{invoice_id}")
+async def update_invoice(invoice_id: str, data: InvoiceInput, user: dict = Depends(get_current_user)):
+    doc = await db.invoices.find_one({"id": invoice_id, "user_id": user["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Fattura non trovata")
+    payload = data.dict()
+    payload["total"] = invoice_total(payload)
+    await db.invoices.update_one({"id": invoice_id, "user_id": user["id"]}, {"$set": payload})
+    updated = await db.invoices.find_one({"id": invoice_id, "user_id": user["id"]})
+    updated = clean(updated)
+    updated.pop("user_id", None)
+    updated.pop("year", None)
+    return updated
+
+
+@api_router.delete("/invoices/{invoice_id}")
+async def delete_invoice(invoice_id: str, user: dict = Depends(get_current_user)):
+    await db.invoices.delete_one({"id": invoice_id, "user_id": user["id"]})
+    return {"ok": True}
+
+
 
 # ----------------------- Declarations routes -----------------------
 async def next_declaration_number(user_id: str) -> str:

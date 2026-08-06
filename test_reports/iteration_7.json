@@ -1,0 +1,35 @@
+{
+  "summary": "Full backend + frontend test of the new Fatturazione module (Listino + Fatture + Cedolino pre-fattura). Backend: 45/45 pytest total passing (16 new billing tests + 29 regression). Listino CRUD: create with mode='flat' and mode='per_element' both persist; PUT updates fields and mode; DELETE removes; 404 on missing item. Invoices: POST assigns number FT-YYYY-NNNN (verified FT-2026-0001), server-side total is correct — 2 lines (3x10.00 + 1x50.00) with bollo=true yields 82.00 exactly; sequential numbering verified (NNNN increments per year); PUT recomputes total (100→202 after adding qty and bollo) and preserves number; DELETE returns 200 and subsequent GET returns 404; default exemption_text contains 'art. 10'; responses do not leak _id or user_id; auth required (401/403 without JWT). Frontend UI tested at 390x844 mobile viewport with tecnico@lab.it: Profilo → 'Fatturazione' row (open-billing) navigates to /billing showing Fatture/Listino segments; on Listino tab, billing-add-fab opens the price sheet, mode toggle (price-mode-flat/price-mode-element) switches between Forfait and Per elemento (visual active state changes), price-save-button persists and 'TEST UI Corona · Per elemento · TEST cat · €45,00' appears immediately with 'Voce salvata' toast. On Fatture tab, FAB routes to /billing/new; manual client name input works; the listino chip 'add-price-<id>' appears at bottom and adding it pre-fills a line; add-empty-line adds a second row; editing line-desc/line-qty/line-price recomputes total live (verified €82,00 shown before create when 3x10 + 1x50 + bollo=2); invoice-bollo-toggle switches marca da bollo on with correct hint 'fatture esenti > €77,47'; create-invoice-button submits and navigates to /billing/<id> — detail screen shows FT-2026-0001, cliente 'TEST Studio UI', total €82,00, both lines with correct 'per elemento' / 'forfait' badges, 'Include marca da bollo €2,00', and the exemption sentence. preview-invoice-button renders the PDF preview with 'Fattura' title, 'N. FT-2026-0001', fornitore/cliente boxes, Imponibile/IVA(esente art.10)/Marca da bollo/Totale table, and the full art.10 D.P.R. 633/1972 disclaimer plus the bollo assolto sull'originale note. preview-cedolino-button renders the same content under 'Cedolino pre-fattura' with the yellow banner 'CEDOLINO PRE-FATTURA · DOCUMENTO RIEPILOGATIVO NON FISCALE' and 'Documento riepilogativo non fiscale' footer. invoice-delete-header → confirm-delete-invoice deletes the invoice and navigates back to /billing where the list is empty. All requested testIDs are wired correctly.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_billing.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/backend/tests/test_odontocert.py",
+    "/app/test_reports/pytest/pytest_billing.xml",
+    "/app/test_reports/pytest/pytest_all.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/server.py invoice_total (line 476): uses `l.get('qty')` on InvoiceLine dicts — works because Pydantic serialization produces a dict with keys. Fine.",
+    "backend/server.py next_invoice_number (line 513): uses count_documents({user_id, year}). Because deleted invoices decrement the count, a delete-then-create sequence can reuse a number (e.g., delete FT-2026-0001 and create a new one → also FT-2026-0001). For a compliance/fiscal document numbers should be MONOTONICALLY INCREASING and never reused. Consider using max(number)+1 or a dedicated counter document. This is a real correctness concern for an Italian invoicing feature — please address before production.",
+    "backend/server.py InvoiceInput.declaration_ids (line 468) is declared but never persisted separately from InvoiceLine.declaration_id — the field is stored on the document but no logic references it. Either remove or wire up.",
+    "frontend billing/new.tsx computes total client-side as `subtotal + (bollo ? 2 : 0)` (hard-coded 2) instead of using invoice.bollo_amount. If the amount is ever customized (currently server default 2.0) the UI preview will diverge. Minor.",
+    "frontend billing/new.tsx line 273 (Totale value in bottom bar) has no testID. Adding testID='invoice-total-preview' would harden future tests.",
+    "frontend billing/index.tsx uses a single billing-add-fab whose onFab branches on active tab (open sheet vs push /billing/new). Works but a bit implicit — consider separate testIDs (add-invoice-fab, add-price-fab)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_billing.py (new file, 16 tests)"
+  ],
+  "success_rate": { "backend": "100% (45/45, of which 16 new billing tests)", "frontend": "100% (all Fatturazione flows: Profilo entry, Listino CRUD, new invoice, live total, previews Fattura + Cedolino, delete)" },
+  "seed_data_creation": "During UI test created price-item 'TEST UI Corona' and one invoice FT-2026-0001 for tecnico@lab.it — both cleaned up (invoice deleted via UI, price-item deleted via API cleanup step). No leftover test data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login: tecnico@lab.it / password123. Fatturazione is reached via tab Profilo → row 'Fatturazione' (open-billing) → /billing. Segments: segment-invoices / segment-listino (default = invoices). Key testIDs — Listino: billing-add-fab (context-aware: opens price sheet on listino tab, navigates to /billing/new on invoices tab); price sheet: price-name-input, price-mode-flat, price-mode-element, price-value-input, price-category-input, price-description-input, price-save-button; list item: price-item-<id>, delete-price-<id>. Invoice list item: invoice-item-<id>. New invoice: pick-client-<id> (client chips), invoice-manual-client, invoice-date, add-price-<id> (listino chips at bottom), add-empty-line, line-desc-<idx>, line-qty-<idx>, line-price-<idx>, remove-line-<idx>, invoice-bollo-toggle, invoice-notes, create-invoice-button; declaration linking (only when a client with declarations is selected): link-decl-<id>. Detail /billing/[id]: invoice-detail-back, invoice-delete-header, preview-invoice-button (opens FATTURA PDF preview with art.10 exemption), preview-cedolino-button (opens 'Cedolino pre-fattura' preview with non-fiscal banner), confirm-delete-invoice / cancel-delete-invoice. Server-side total: sum(qty*unit_price) + (2.0 if bollo). Number format: FT-<year>-<NNNN> (per-user, per-year count).",
+  "rca_of_issue": "N/A — no bugs found. Only recommendation: invoice number generation reuses numbers after delete (see critical_code_review_comments #2). Not blocking current test acceptance but should be tracked."
+}

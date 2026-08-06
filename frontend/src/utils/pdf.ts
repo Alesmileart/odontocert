@@ -569,3 +569,200 @@ export async function exportSingleProtocolPdf(protocol: ProtocolItem, lab: LabPr
   return uri;
 }
 
+
+/* =========================================================================
+ * FATTURAZIONE — Fattura (documento fiscale, esente IVA art. 10) e
+ * Cedolino pre-fattura (documento riepilogativo NON fiscale per lo studio).
+ * ========================================================================= */
+export type InvoiceLineData = { description?: string; qty?: number; unit_price?: number; mode?: string; declaration_id?: string };
+export type InvoiceData = {
+  number?: string;
+  date?: string;
+  client_snapshot?: { name?: string; clinic?: string; address?: string; vat?: string; email?: string; phone?: string };
+  lines?: InvoiceLineData[];
+  exemption_text?: string;
+  bollo?: boolean;
+  bollo_amount?: number;
+  notes?: string;
+  total?: number;
+};
+
+function fmtEur(n?: number) {
+  const v = Number(n || 0);
+  return "€ " + v.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function invoiceStyles() {
+  return `
+  @page { size: A4 portrait; margin: 14mm; }
+  * { box-sizing: border-box; }
+  html, body { background: #ffffff; margin: 0; padding: 0; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #111; font-size: 12px; line-height: 1.45; }
+  .sheet { border: 1px solid #222; background: #fff; padding: 22px 26px; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #2D4A3E; padding-bottom: 10px; margin-bottom: 14px; }
+  .lab { font-weight: bold; color: #1a5b34; font-size: 15px; }
+  .lab-sub { font-size: 10px; color: #444; margin-top: 2px; }
+  .logo { max-height: 48px; }
+  h1 { font-size: 20px; margin: 6px 0 2px; letter-spacing: 0.5px; }
+  .doc-meta { font-size: 11px; color: #333; }
+  .parties { display: flex; gap: 16px; margin: 14px 0 16px; }
+  .party { flex: 1; border: 1px solid #ccc; border-radius: 6px; padding: 10px 12px; }
+  .party h3 { margin: 0 0 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #2D4A3E; }
+  .party .row { margin-bottom: 3px; }
+  .party .k { color: #666; display: inline-block; min-width: 62px; }
+  table.lines { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  table.lines th { background: #2D4A3E; color: #fff; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; padding: 7px 8px; text-align: left; }
+  table.lines td { border-bottom: 1px solid #ddd; padding: 7px 8px; vertical-align: top; }
+  table.lines td.num, table.lines th.num { text-align: right; white-space: nowrap; }
+  .totals { margin-top: 12px; display: flex; justify-content: flex-end; }
+  .totals table { border-collapse: collapse; min-width: 240px; }
+  .totals td { padding: 4px 8px; }
+  .totals .grand td { border-top: 2px solid #2D4A3E; font-weight: bold; font-size: 15px; }
+  .exempt { margin-top: 16px; font-size: 10.5px; color: #333; border: 1px dashed #999; border-radius: 6px; padding: 8px 10px; background: #fafafa; }
+  .notes { margin-top: 12px; font-size: 11px; color: #333; }
+  .foot { margin-top: 22px; border-top: 1px solid #ccc; padding-top: 8px; font-size: 9.5px; color: #666; }
+  .banner { background: #fff4d6; border: 1px solid #e0b400; color: #7a5b00; text-align: center; font-weight: bold; padding: 6px; border-radius: 6px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; }
+  .muted { color: #888; }`;
+}
+
+function invoicePartiesHtml(inv: InvoiceData, lab: LabProfile) {
+  const c = inv.client_snapshot || {};
+  return `
+  <div class="parties">
+    <div class="party">
+      <h3>Fornitore (laboratorio)</h3>
+      <div class="row"><span class="k">Nome</span> <b>${lab.lab_name || "—"}</b></div>
+      <div class="row"><span class="k">Indirizzo</span> ${lab.address || ""} ${lab.city || ""}</div>
+      <div class="row"><span class="k">P.IVA</span> ${lab.vat || "—"}</div>
+      <div class="row"><span class="k">Reg.</span> ${lab.registration_number || ""} ${lab.reg_imprese ? "· " + lab.reg_imprese : ""}</div>
+      <div class="row"><span class="k">Contatti</span> ${[lab.phone, lab.email].filter(Boolean).join(" · ") || "—"}</div>
+    </div>
+    <div class="party">
+      <h3>Cliente (studio / odontoiatra)</h3>
+      <div class="row"><span class="k">Nome</span> <b>${c.name || "—"}</b></div>
+      <div class="row"><span class="k">Studio</span> ${c.clinic || "—"}</div>
+      <div class="row"><span class="k">Indirizzo</span> ${c.address || "—"}</div>
+      <div class="row"><span class="k">P.IVA</span> ${c.vat || "—"}</div>
+      <div class="row"><span class="k">Contatti</span> ${[c.phone, c.email].filter(Boolean).join(" · ") || "—"}</div>
+    </div>
+  </div>`;
+}
+
+function invoiceLinesHtml(inv: InvoiceData) {
+  const rows = (inv.lines || [])
+    .map((l) => {
+      const qty = Number(l.qty || 0);
+      const price = Number(l.unit_price || 0);
+      const tot = qty * price;
+      const modeLabel = l.mode === "per_element" ? "per elemento" : "forfait";
+      return `<tr>
+        <td>${escapeHtml(l.description || "—")}<div class="muted" style="font-size:9px">${modeLabel}</div></td>
+        <td class="num">${qty.toLocaleString("it-IT")}</td>
+        <td class="num">${fmtEur(price)}</td>
+        <td class="num">${fmtEur(tot)}</td>
+      </tr>`;
+    })
+    .join("");
+  return `
+  <table class="lines">
+    <thead><tr><th>Descrizione</th><th class="num">Q.tà</th><th class="num">Prezzo unit.</th><th class="num">Importo</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4" class="muted">Nessuna riga</td></tr>'}</tbody>
+  </table>`;
+}
+
+function invoiceTotalsHtml(inv: InvoiceData) {
+  const subtotal = (inv.lines || []).reduce((s, l) => s + Number(l.qty || 0) * Number(l.unit_price || 0), 0);
+  const bollo = inv.bollo ? Number(inv.bollo_amount || 0) : 0;
+  const grand = subtotal + bollo;
+  return `
+  <div class="totals">
+    <table>
+      <tr><td>Imponibile</td><td class="num">${fmtEur(subtotal)}</td></tr>
+      <tr><td>IVA (esente art. 10)</td><td class="num">${fmtEur(0)}</td></tr>
+      ${bollo ? `<tr><td>Marca da bollo</td><td class="num">${fmtEur(bollo)}</td></tr>` : ""}
+      <tr class="grand"><td>Totale</td><td class="num">${fmtEur(grand)}</td></tr>
+    </table>
+  </div>`;
+}
+
+function invoiceHeadHtml(lab: LabProfile) {
+  const logo = lab.logo_base64 ? `<img src="${lab.logo_base64}" class="logo" />` : "";
+  return `
+  <div class="top">
+    <div>
+      <div class="lab">${lab.lab_name || "Laboratorio Odontotecnico"}</div>
+      <div class="lab-sub">${lab.address || ""} ${lab.city ? "· " + lab.city : ""}</div>
+      <div class="lab-sub">${lab.vat ? "P.IVA " + lab.vat : ""} ${lab.registration_number ? "· Reg. Min. Sal. " + lab.registration_number : ""}</div>
+    </div>
+    <div>${logo}</div>
+  </div>`;
+}
+
+export function buildInvoiceHtml(inv: InvoiceData, lab: LabProfile): string {
+  const exemption = inv.exemption_text || "Operazione esente IVA ai sensi dell'art. 10, n. 18, D.P.R. 633/1972";
+  return `
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=794, initial-scale=1" />
+<style>${invoiceStyles()}</style>
+</head>
+<body>
+  <div class="sheet">
+    ${invoiceHeadHtml(lab)}
+    <h1>Fattura</h1>
+    <div class="doc-meta"><b>N. ${inv.number || "—"}</b> &nbsp;·&nbsp; Data: ${fmtDate(inv.date)}</div>
+    ${invoicePartiesHtml(inv, lab)}
+    ${invoiceLinesHtml(inv)}
+    ${invoiceTotalsHtml(inv)}
+    <div class="exempt">${escapeHtml(exemption)}${inv.bollo ? "<br/>Imposta di bollo assolta sull'originale (art. 13 Tariffa, parte I, D.P.R. 642/1972) — importo € 2,00 a carico del cliente." : ""}</div>
+    ${inv.notes ? `<div class="notes"><b>Note:</b> ${escapeHtml(inv.notes)}</div>` : ""}
+    <div class="foot">Documento emesso da ${lab.lab_name || ""}. Fattura esente IVA — la presente vale come documento fiscale ai fini della prestazione indicata.</div>
+  </div>
+</body>
+</html>`;
+}
+
+export function buildCedolinoHtml(inv: InvoiceData, lab: LabProfile): string {
+  return `
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=794, initial-scale=1" />
+<style>${invoiceStyles()}</style>
+</head>
+<body>
+  <div class="sheet">
+    ${invoiceHeadHtml(lab)}
+    <div class="banner">Cedolino pre-fattura · documento riepilogativo non fiscale</div>
+    <h1>Cedolino pre-fattura</h1>
+    <div class="doc-meta">Riferimento: ${inv.number || "—"} &nbsp;·&nbsp; Data: ${fmtDate(inv.date)}</div>
+    ${invoicePartiesHtml(inv, lab)}
+    ${invoiceLinesHtml(inv)}
+    ${invoiceTotalsHtml(inv)}
+    ${inv.notes ? `<div class="notes"><b>Note:</b> ${escapeHtml(inv.notes)}</div>` : ""}
+    <div class="foot">Documento riepilogativo <b>non fiscale</b> consegnato allo studio a scopo di verifica dei lavori. Non sostituisce la fattura. Emesso da ${lab.lab_name || ""} il ${fmtDate(inv.date)}.</div>
+  </div>
+</body>
+</html>`;
+}
+
+export async function exportInvoicePdf(inv: InvoiceData, lab: LabProfile, kind: "invoice" | "cedolino" = "invoice") {
+  const html = kind === "cedolino" ? buildCedolinoHtml(inv, lab) : buildInvoiceHtml(inv, lab);
+  if (Platform.OS === "web") {
+    await Print.printAsync({ html });
+    return;
+  }
+  const { uri } = await Print.printToFileAsync({ html, base64: false, width: 595, height: 842 });
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, {
+      mimeType: "application/pdf",
+      dialogTitle: kind === "cedolino" ? "Condividi cedolino" : "Condividi fattura",
+      UTI: "com.adobe.pdf",
+    });
+  }
+  return uri;
+}
+

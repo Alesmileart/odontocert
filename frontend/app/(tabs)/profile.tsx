@@ -146,6 +146,21 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </Pressable>
 
+        <Pressable style={styles.navRow} onPress={() => router.push("/billing")} testID="open-billing">
+          <View style={styles.navIcon}>
+            <Ionicons name="receipt-outline" size={20} color={colors.brandPrimary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppText variant="semibold" size={fontSize.base}>
+              Fatturazione
+            </AppText>
+            <AppText size={fontSize.sm} color={colors.muted}>
+              Fatture ai clienti · listino · cedolino pre-fattura
+            </AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+        </Pressable>
+
         <Pressable style={styles.navRow} onPress={() => router.push("/provider-settings")} testID="open-provider-settings">
           <View style={styles.navIcon}>
             <Ionicons name="shield-checkmark-outline" size={20} color={colors.brandPrimary} />
