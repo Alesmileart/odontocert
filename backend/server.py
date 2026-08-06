@@ -492,7 +492,7 @@ async def create_declaration(data: DeclarationInput, user: dict = Depends(get_cu
             if mid and qty and qty > 0:
                 mat = await db.materials.find_one({"id": mid, "user_id": user["id"]})
                 if mat and mat.get("track_stock"):
-                    new_stock = (mat.get("stock") or 0) - qty
+                    new_stock = max(0, (mat.get("stock") or 0) - qty)
                     await db.materials.update_one(
                         {"id": mid, "user_id": user["id"]},
                         {"$set": {"stock": new_stock, "stock_updated_at": now_iso()}},
