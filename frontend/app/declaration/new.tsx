@@ -15,11 +15,11 @@ import { useToast } from "@/src/components/Toast";
 import { colors, fontSize, spacing, radius } from "@/src/theme";
 
 type Client = { id: string; name: string; clinic: string; address: string; vat: string; email: string; phone: string };
-type Material = { id: string; name: string; manufacturer: string; ce_number: string; lot_default: string; category: string };
-type DeclMaterial = { name: string; manufacturer: string; ce_number: string; lot: string; category: string };
+type Material = { id: string; name: string; manufacturer: string; ce_number: string; lot_default: string; category: string; track_stock?: boolean; unit?: string };
+type DeclMaterial = { name: string; manufacturer: string; ce_number: string; lot: string; category: string; material_id: string; qty: number; unit: string };
 
 const STEPS = ["Lavoro", "Arcata", "Prescrizione", "Etichetta", "Firma"];
-const emptyMat: DeclMaterial = { name: "", manufacturer: "", ce_number: "", lot: "", category: "" };
+const emptyMat: DeclMaterial = { name: "", manufacturer: "", ce_number: "", lot: "", category: "", material_id: "", qty: 0, unit: "" };
 
 export default function NewDeclaration() {
   const insets = useSafeAreaInsets();
@@ -57,6 +57,8 @@ export default function NewDeclaration() {
 
   const [matSheet, setMatSheet] = useState(false);
   const [customMat, setCustomMat] = useState<DeclMaterial>(emptyMat);
+  const [savePrompt, setSavePrompt] = useState<DeclMaterial | null>(null);
+  const [savingLib, setSavingLib] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -84,6 +86,9 @@ export default function NewDeclaration() {
             ce_number: mm.ce_number || "",
             lot: mm.lot || "",
             category: mm.category || "",
+            material_id: mm.material_id || "",
+            qty: mm.qty || 0,
+            unit: mm.unit || "",
           }))
         );
         setUsageDays(src.usage_days || "30");
@@ -122,7 +127,16 @@ export default function NewDeclaration() {
   const addLibMaterial = (m: Material) =>
     setMaterials((prev) => [
       ...prev,
-      { name: m.name, manufacturer: m.manufacturer, ce_number: m.ce_number, lot: m.lot_default, category: m.category },
+      {
+        name: m.name,
+        manufacturer: m.manufacturer,
+        ce_number: m.ce_number,
+        lot: m.lot_default,
+        category: m.category,
+        material_id: m.id,
+        qty: 0,
+        unit: m.unit || "",
+      },
     ]);
 
   const addCustomMaterial = () => {
@@ -130,14 +144,51 @@ export default function NewDeclaration() {
       toast.show("Inserisci il nome del materiale", "error");
       return;
     }
-    setMaterials((prev) => [...prev, customMat]);
+    const mat = { ...customMat };
+    setMaterials((prev) => [...prev, mat]);
     setCustomMat(emptyMat);
     setMatSheet(false);
+    // Se il materiale non esiste in anagrafica, chiedi se salvarlo
+    const exists = libMaterials.some((lm) => lm.name.trim().toLowerCase() === mat.name.trim().toLowerCase());
+    if (!exists) {
+      setSavePrompt(mat);
+    }
+  };
+
+  const saveNewToLibrary = async () => {
+    if (!savePrompt) return;
+    setSavingLib(true);
+    try {
+      const created = await api.post<Material>("/materials", {
+        name: savePrompt.name,
+        manufacturer: savePrompt.manufacturer,
+        ce_number: savePrompt.ce_number,
+        lot_default: savePrompt.lot,
+        category: savePrompt.category,
+      });
+      // Aggiorna la lista in memoria e collega l'id al materiale della dichiarazione
+      setLibMaterials((prev) => [...prev, created]);
+      setMaterials((prev) =>
+        prev.map((m) =>
+          !m.material_id && m.name === savePrompt.name && m.manufacturer === savePrompt.manufacturer
+            ? { ...m, material_id: created.id }
+            : m
+        )
+      );
+      toast.show("Materiale salvato in anagrafica", "success");
+    } catch (e) {
+      toast.show(e instanceof Error ? e.message : "Errore salvataggio materiale", "error");
+    } finally {
+      setSavingLib(false);
+      setSavePrompt(null);
+    }
   };
 
   const removeMaterial = (idx: number) => setMaterials((prev) => prev.filter((_, i) => i !== idx));
   const updateLot = (idx: number, lot: string) =>
     setMaterials((prev) => prev.map((m, i) => (i === idx ? { ...m, lot } : m)));
+  const updateQty = (idx: number, qtyText: string) =>
+    setMaterials((prev) => prev.map((m, i) => (i === idx ? { ...m, qty: parseFloat(qtyText.replace(",", ".")) || 0 } : m)));
 
   const canNext = () => {
     if (step === 0) return !!patientName.trim() && !!deviceType.trim();
@@ -363,6 +414,16 @@ export default function NewDeclaration() {
                         </Pressable>
                       </View>
                       <Field label="Numero di lotto" value={m.lot} onChangeText={(t) => updateLot(idx, t)} placeholder="LOT-…" mono autoCapitalize="characters" testID={`material-lot-${idx}`} />
+                      {m.material_id && m.unit ? (
+                        <Field
+                          label={`Quantità utilizzata (${m.unit}) — scarico magazzino`}
+                          value={m.qty ? String(m.qty) : ""}
+                          onChangeText={(t) => updateQty(idx, t)}
+                          placeholder="0"
+                          keyboardType="decimal-pad"
+                          testID={`material-qty-${idx}`}
+                        />
+                      ) : null}
                     </Card>
                   ))}
                 </View>
@@ -421,6 +482,23 @@ export default function NewDeclaration() {
         <Field label="Produttore" value={customMat.manufacturer} onChangeText={(t) => setCustomMat({ ...customMat, manufacturer: t })} placeholder="Ivoclar" testID="custom-mat-manufacturer" />
         <Field label="Marcatura CE" value={customMat.ce_number} onChangeText={(t) => setCustomMat({ ...customMat, ce_number: t })} placeholder="CE 0123" mono autoCapitalize="characters" testID="custom-mat-ce" />
         <Field label="Numero di lotto" value={customMat.lot} onChangeText={(t) => setCustomMat({ ...customMat, lot: t })} placeholder="LOT-…" mono autoCapitalize="characters" testID="custom-mat-lot" />
+      </FormSheet>
+
+      <FormSheet
+        visible={!!savePrompt}
+        title="Salvare in anagrafica?"
+        onClose={() => setSavePrompt(null)}
+        footer={
+          <View style={{ gap: spacing.sm }}>
+            <Button title="Sì, salva in anagrafica" onPress={saveNewToLibrary} loading={savingLib} testID="save-new-material-yes" />
+            <Button title="No, usa solo qui" kind="secondary" onPress={() => setSavePrompt(null)} disabled={savingLib} testID="save-new-material-no" />
+          </View>
+        }
+      >
+        <AppText size={fontSize.base} color={colors.onSurfaceSecondary}>
+          «{savePrompt?.name}» non è presente nella tua anagrafica materiali. Vuoi aggiungerlo per
+          riutilizzarlo nelle prossime dichiarazioni?
+        </AppText>
       </FormSheet>
     </View>
   );

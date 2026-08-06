@@ -116,6 +116,22 @@ class Profile(BaseModel):
     logo_base64: str = ""
 
 
+class ProviderSettings(BaseModel):
+    # Firma digitale (predisposizione, non ancora operativa)
+    signature_provider: str = ""
+    signature_reference: str = ""
+    signature_enabled: bool = False
+    # PEC
+    pec_provider: str = ""
+    pec_address: str = ""
+    pec_enabled: bool = False
+    # Conservazione a norma
+    conservation_provider: str = ""
+    conservation_reference: str = ""
+    conservation_enabled: bool = False
+    notes: str = ""
+
+
 class Client(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -142,6 +158,13 @@ class Material(BaseModel):
     ce_number: str = ""
     lot_default: str = ""
     category: str = ""
+    # Magazzino
+    track_stock: bool = False
+    unit: str = ""          # unità di misura (pz, g, ml, ...)
+    stock: float = 0        # giacenza
+    min_stock: float = 0    # scorta minima
+    location: str = ""      # ubicazione
+    stock_updated_at: str = ""
 
 
 class MaterialInput(BaseModel):
@@ -150,6 +173,16 @@ class MaterialInput(BaseModel):
     ce_number: str = ""
     lot_default: str = ""
     category: str = ""
+    track_stock: bool = False
+    unit: str = ""
+    stock: float = 0
+    min_stock: float = 0
+    location: str = ""
+
+
+class StockAdjust(BaseModel):
+    delta: float
+    reason: str = ""
 
 
 class DeclarationMaterial(BaseModel):
@@ -158,6 +191,9 @@ class DeclarationMaterial(BaseModel):
     ce_number: str = ""
     lot: str = ""
     category: str = ""
+    material_id: str = ""
+    qty: float = 0
+    unit: str = ""
 
 
 class Conformity(BaseModel):
@@ -258,6 +294,25 @@ async def update_profile(data: Profile, user: dict = Depends(get_current_user)):
     return data
 
 
+# ----------------------- Provider settings -----------------------
+@api_router.get("/provider-settings", response_model=ProviderSettings)
+async def get_provider_settings(user: dict = Depends(get_current_user)):
+    doc = await db.provider_settings.find_one({"user_id": user["id"]})
+    if not doc:
+        return ProviderSettings()
+    return ProviderSettings(**{k: v for k in ProviderSettings.model_fields.keys() if (v := doc.get(k)) is not None})
+
+
+@api_router.put("/provider-settings", response_model=ProviderSettings)
+async def update_provider_settings(data: ProviderSettings, user: dict = Depends(get_current_user)):
+    await db.provider_settings.update_one(
+        {"user_id": user["id"]},
+        {"$set": {**data.dict(), "user_id": user["id"]}},
+        upsert=True,
+    )
+    return data
+
+
 # ----------------------- Clients routes -----------------------
 @api_router.get("/clients", response_model=List[Client])
 async def list_clients(user: dict = Depends(get_current_user)):
@@ -291,12 +346,14 @@ async def delete_client(client_id: str, user: dict = Depends(get_current_user)):
 @api_router.get("/materials", response_model=List[Material])
 async def list_materials(user: dict = Depends(get_current_user)):
     docs = await db.materials.find({"user_id": user["id"]}).sort("name", 1).to_list(1000)
-    return [Material(**{k: d.get(k) for k in Material.model_fields.keys()}) for d in docs]
+    return [Material(**{k: v for k in Material.model_fields.keys() if (v := d.get(k)) is not None}) for d in docs]
 
 
 @api_router.post("/materials", response_model=Material, status_code=201)
 async def create_material(data: MaterialInput, user: dict = Depends(get_current_user)):
     obj = Material(**data.dict())
+    if obj.track_stock:
+        obj.stock_updated_at = now_iso()
     await db.materials.insert_one({**obj.dict(), "user_id": user["id"], "created_at": now_iso()})
     return obj
 
@@ -306,8 +363,27 @@ async def update_material(material_id: str, data: MaterialInput, user: dict = De
     doc = await db.materials.find_one({"id": material_id, "user_id": user["id"]})
     if not doc:
         raise HTTPException(status_code=404, detail="Materiale non trovato")
-    await db.materials.update_one({"id": material_id, "user_id": user["id"]}, {"$set": data.dict()})
-    return Material(id=material_id, **data.dict())
+    updated = Material(id=material_id, **data.dict())
+    if updated.track_stock:
+        updated.stock_updated_at = now_iso()
+    await db.materials.update_one({"id": material_id, "user_id": user["id"]}, {"$set": {k: v for k, v in updated.dict().items() if k != "id"}})
+    return updated
+
+
+@api_router.post("/materials/{material_id}/adjust", response_model=Material)
+async def adjust_material_stock(material_id: str, data: StockAdjust, user: dict = Depends(get_current_user)):
+    doc = await db.materials.find_one({"id": material_id, "user_id": user["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Materiale non trovato")
+    new_stock = (doc.get("stock") or 0) + data.delta
+    await db.materials.update_one(
+        {"id": material_id, "user_id": user["id"]},
+        {"$set": {"stock": new_stock, "track_stock": True, "stock_updated_at": now_iso()}},
+    )
+    doc["stock"] = new_stock
+    doc["track_stock"] = True
+    doc["stock_updated_at"] = now_iso()
+    return Material(**{k: v for k in Material.model_fields.keys() if (v := doc.get(k)) is not None})
 
 
 @api_router.delete("/materials/{material_id}")
@@ -408,6 +484,19 @@ async def create_declaration(data: DeclarationInput, user: dict = Depends(get_cu
         "issue_date": data.issue_date or now_iso(),
     }
     await db.declarations.insert_one(dict(doc))
+    # Scarico automatico magazzino: solo su dichiarazione emessa e materiali con quantità
+    if data.signature_base64:
+        for m in payload.get("materials", []):
+            mid = m.get("material_id")
+            qty = m.get("qty") or 0
+            if mid and qty and qty > 0:
+                mat = await db.materials.find_one({"id": mid, "user_id": user["id"]})
+                if mat and mat.get("track_stock"):
+                    new_stock = (mat.get("stock") or 0) - qty
+                    await db.materials.update_one(
+                        {"id": mid, "user_id": user["id"]},
+                        {"$set": {"stock": new_stock, "stock_updated_at": now_iso()}},
+                    )
     out = clean(doc)
     out.pop("user_id", None)
     out.pop("year", None)

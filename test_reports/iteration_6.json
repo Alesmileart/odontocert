@@ -1,0 +1,31 @@
+{
+  "summary": "Full backend + frontend test of the three new features: (1) Provider Settings screen (GET/PUT /api/provider-settings), (2) Warehouse (Magazzino) module with inventory-enabled materials + carico/scarico + auto-deduct on issued declarations, (3) save-new-material prompt in declaration wizard step 3. Backend: 29/29 pytest passing (12 new + 17 regression). Frontend UI tested end-to-end at 390x844 mobile viewport, JWT tecnico@lab.it: Magazzino tab renders with correct empty state and 'Vai all\\'Anagrafica' CTA; Anagrafica → materials form now shows 'Gestisci giacenza (magazzino)' toggle that reveals unit/stock/min_stock/location fields when enabled; after saving a tracked material (TEST Zirc UI2, stock=12) it appears in Magazzino (1 materiale tracciato); scarico -2 correctly updates 12 → 10 with 'Scarico registrato' toast; Provider settings accessible from Profilo → 'open-provider-settings' with 3 sections (Firma digitale, PEC, Conservazione a norma) each with its enable toggle, plus notes; PUT persists (signature_provider='Aruba TEST', pec_address='labtest@pec.aruba.it', conservation_provider='Namirial TEST', signature_enabled=true → badge changes from 'Non attivo' to 'Predisposto'); Declaration wizard step 3: adding a custom material with 'add-custom-material' → 'confirm-custom-material' triggers the 'Salvare in anagrafica?' FormSheet with save-new-material-yes/no; tap Sì creates the material via POST /api/materials, shows 'Materiale salvato in anagrafica' toast, and the new item appears as a library chip. All flows working correctly.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/backend/tests/test_odontocert.py",
+    "/app/test_reports/pytest/pytest_new_features.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/server.py get_provider_settings/list_materials use a walrus-inside-dict-comprehension pattern `{k: v for k in Model.model_fields.keys() if (v := doc.get(k)) is not None}`. This correctly filters None but silently drops any field explicitly set to 0/False/'' only if the DB stored them as None. For inventory fields (stock=0, track_stock=False) this is fine because they are stored as 0/False, not None, but any legacy doc missing the key will fall back to Pydantic default — works but subtle.",
+    "backend/server.py create_declaration auto-deduct block does not clamp new_stock at 0; issuing a declaration with qty > stock will produce a NEGATIVE stock in the DB. Consider max(0, new_stock) or reject the declaration. Also does not record a movement log, so audit trail of automatic scarico is missing.",
+    "backend/server.py adjust_material_stock similarly allows negative deltas to push stock below zero without validation.",
+    "frontend warehouse.tsx confirmAdjust: after scarico the request goes through but if server rejects (future validation) the local `load()` still refetches — OK. However there is no confirmation step for scarico that would send stock negative; the button remains enabled.",
+    "frontend declaration/new.tsx saveNewToLibrary: when a material is saved via the prompt, only the FIRST matching entry (by name+manufacturer) gets material_id patched. If the user added the same custom material multiple times, only one is linked. Minor edge case."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_new_features.py (new file, 12 tests)"
+  ],
+  "success_rate": { "backend": "100% (29/29)", "frontend": "100% (all 3 new-feature flows)" },
+  "seed_data_creation": "During UI test created TEST Zirc UI2 and TEST CustomMat NEW materials; both cleaned up via DELETE /api/materials after the run. Provider settings for tecnico@lab.it now contain: signature_provider='Aruba TEST', signature_enabled=true, pec_address='labtest@pec.aruba.it', conservation_provider='Namirial TEST', notes='UI test note'. If undesired, main agent should reset via PUT with empty payload.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login: tecnico@lab.it / password123 → tab Magazzino (index 4 after Anagrafica). Key testIDs — Anagrafica material form: material-name-input, material-track-toggle, material-unit-input, material-stock-input, material-minstock-input, material-location-input, sheet-save-button (this is the shared save button inside the FormSheet, NOT 'material-save-button'). Warehouse: warehouse-empty (empty state), warehouse-goto-library, warehouse-item-<id>, load-<id>, unload-<id>, adjust-amount-input, confirm-adjust; also warehouse-low-<id> when stock<=min_stock. Provider Settings: profile → open-provider-settings; screen has section-signature, section-pec, section-conservation (each with -toggle suffix), signature-provider-input, signature-reference-input, pec-provider-input, pec-address-input, conservation-provider-input, conservation-reference-input, provider-notes-input, save-provider-button, provider-back. Wizard step 3 save-new-material flow: add-custom-material → FormSheet with custom-mat-name/manufacturer/ce/lot → confirm-custom-material → if name not in libMaterials, savePrompt sheet opens with save-new-material-yes / save-new-material-no. Backend auto-deduct is triggered ONLY when signature_base64 is truthy AND material has material_id + qty>0 + track_stock=true; draft (empty signature) does NOT deduct. Backend tests in /app/backend/tests/test_new_features.py cover all these cases."
+}

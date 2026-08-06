@@ -11,10 +11,34 @@ import { useToast } from "@/src/components/Toast";
 import { colors, fontSize, spacing, radius } from "@/src/theme";
 
 type Client = { id: string; name: string; clinic: string; address: string; vat: string; email: string; phone: string };
-type Material = { id: string; name: string; manufacturer: string; ce_number: string; lot_default: string; category: string };
+type Material = {
+  id: string;
+  name: string;
+  manufacturer: string;
+  ce_number: string;
+  lot_default: string;
+  category: string;
+  track_stock: boolean;
+  unit: string;
+  stock: number;
+  min_stock: number;
+  location: string;
+};
 
 const emptyClient: Client = { id: "", name: "", clinic: "", address: "", vat: "", email: "", phone: "" };
-const emptyMaterial: Material = { id: "", name: "", manufacturer: "", ce_number: "", lot_default: "", category: "" };
+const emptyMaterial: Material = {
+  id: "",
+  name: "",
+  manufacturer: "",
+  ce_number: "",
+  lot_default: "",
+  category: "",
+  track_stock: false,
+  unit: "",
+  stock: 0,
+  min_stock: 0,
+  location: "",
+};
 
 export default function Library() {
   const insets = useSafeAreaInsets();
@@ -211,6 +235,33 @@ export default function Library() {
             <Field label="Marcatura CE" value={editMaterial.ce_number} onChangeText={(t) => setEditMaterial({ ...editMaterial, ce_number: t })} placeholder="CE 0123" mono autoCapitalize="characters" testID="material-ce-input" />
             <Field label="Lotto predefinito" value={editMaterial.lot_default} onChangeText={(t) => setEditMaterial({ ...editMaterial, lot_default: t })} placeholder="LOT-2026-001" mono autoCapitalize="characters" testID="material-lot-input" />
             <Field label="Categoria" value={editMaterial.category} onChangeText={(t) => setEditMaterial({ ...editMaterial, category: t })} placeholder="Ceramica" testID="material-category-input" />
+
+            <Pressable
+              style={styles.trackToggle}
+              onPress={() => setEditMaterial({ ...editMaterial, track_stock: !editMaterial.track_stock })}
+              testID="material-track-toggle"
+            >
+              <View style={[styles.checkbox, editMaterial.track_stock && styles.checkboxOn]}>
+                {editMaterial.track_stock ? <Ionicons name="checkmark" size={16} color={colors.onBrandPrimary} /> : null}
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText variant="semibold" size={fontSize.base}>
+                  Gestisci giacenza (magazzino)
+                </AppText>
+                <AppText size={fontSize.sm} color={colors.muted}>
+                  Traccia la quantità disponibile e la scorta minima
+                </AppText>
+              </View>
+            </Pressable>
+
+            {editMaterial.track_stock ? (
+              <>
+                <Field label="Unità di misura" value={editMaterial.unit} onChangeText={(t) => setEditMaterial({ ...editMaterial, unit: t })} placeholder="pz, g, ml…" testID="material-unit-input" />
+                <Field label="Giacenza attuale" value={String(editMaterial.stock ?? 0)} onChangeText={(t) => setEditMaterial({ ...editMaterial, stock: parseFloat(t.replace(",", ".")) || 0 })} placeholder="0" keyboardType="decimal-pad" testID="material-stock-input" />
+                <Field label="Scorta minima" value={String(editMaterial.min_stock ?? 0)} onChangeText={(t) => setEditMaterial({ ...editMaterial, min_stock: parseFloat(t.replace(",", ".")) || 0 })} placeholder="0" keyboardType="decimal-pad" testID="material-minstock-input" />
+                <Field label="Ubicazione" value={editMaterial.location} onChangeText={(t) => setEditMaterial({ ...editMaterial, location: t })} placeholder="Es. Scaffale A2" testID="material-location-input" />
+              </>
+            ) : null}
           </>
         )}
       </FormSheet>
@@ -248,6 +299,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   emptyText: { marginTop: spacing.xs, textAlign: "center", paddingHorizontal: spacing.xl },
+  trackToggle: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, marginTop: spacing.xs },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: radius.sm,
+    borderWidth: 2,
+    borderColor: colors.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxOn: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
   fab: {
     position: "absolute",
     right: spacing.xl,

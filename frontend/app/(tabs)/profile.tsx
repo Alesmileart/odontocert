@@ -146,9 +146,20 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </Pressable>
 
-        <AppText variant="bold" size={fontSize.lg} style={styles.sectionTitle}>
-          Dati del laboratorio
-        </AppText>
+        <Pressable style={styles.navRow} onPress={() => router.push("/provider-settings")} testID="open-provider-settings">
+          <View style={styles.navIcon}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={colors.brandPrimary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppText variant="semibold" size={fontSize.base}>
+              Impostazioni provider
+            </AppText>
+            <AppText size={fontSize.sm} color={colors.muted}>
+              Firma digitale · PEC · conservazione (predisposizione)
+            </AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+        </Pressable>
         <AppText size={fontSize.sm} color={colors.muted} style={styles.sectionHint}>
           Questi dati vengono inseriti automaticamente in ogni dichiarazione.
         </AppText>
