@@ -512,8 +512,16 @@ async def delete_price_item(item_id: str, user: dict = Depends(get_current_user)
 # ----------------------- Fatture (invoices) routes -----------------------
 async def next_invoice_number(user_id: str) -> str:
     year = datetime.now(timezone.utc).year
-    count = await db.invoices.count_documents({"user_id": user_id, "year": year})
-    return f"FT-{year}-{count + 1:04d}"
+    # Numerazione monotona: usa il numero più alto emesso nell'anno, non il conteggio
+    # (così l'eliminazione di una fattura non fa riutilizzare un numero già usato).
+    docs = await db.invoices.find({"user_id": user_id, "year": year}).to_list(5000)
+    max_seq = 0
+    for d in docs:
+        num = str(d.get("number", ""))
+        parts = num.split("-")
+        if len(parts) == 3 and parts[2].isdigit():
+            max_seq = max(max_seq, int(parts[2]))
+    return f"FT-{year}-{max_seq + 1:04d}"
 
 
 @api_router.get("/invoices")

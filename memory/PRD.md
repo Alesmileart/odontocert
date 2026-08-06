@@ -41,13 +41,13 @@
 - [x] Impostazioni provider (Profilo -> Impostazioni provider): predisposizione firma digitale/PEC/conservazione, salva solo riferimenti non sensibili + toggle Predisposto/Non attivo. API GET/PUT /api/provider-settings. NON operativa (nessuna firma/PEC/conservazione reale).
 - [x] Magazzino (tab in basso): giacenza materiali con unità, scorta minima, ubicazione; toggle "Gestisci giacenza" in Anagrafica; badge sotto-scorta; carico/scarico manuale (POST /api/materials/{id}/adjust); scarico automatico su dichiarazione EMESSA quando il materiale ha unità e quantità utilizzata (clamp a 0).
 - [x] Salvataggio materiale manuale: in dichiarazione, se il materiale digitato non è in anagrafica, chiede "Salvare in anagrafica?" e lo aggiunge alla libreria se confermato.
+- [x] Fatturazione (Profilo -> Fatturazione): Listino voci prezzo (forfait o per elemento), Fatture ai clienti esenti IVA art.10 con righe manuali + collegamento opzionale alle dichiarazioni + marca da bollo €2 opzionale, numerazione monotona FT-AAAA-NNNN, totale calcolato lato server. PDF Fattura (fiscale) e Cedolino pre-fattura (riepilogo NON fiscale per lo studio). API: /api/price-items CRUD, /api/invoices CRUD.
 
 ## Architettura backend condiviso (predisposizione)
 - Backend unico FastAPI + MongoDB con API REST per user/profile/clients/materials/declarations, riutilizzabili da futuri frontend (web magazzino, fatturazione).
 - Dati anagrafica cliente e materiali centralizzati e già richiamati dalla dichiarazione → pronti per moduli magazzino/fatturazione.
 
 ## Backlog (prioritized)
-- P2: Modulo fatturazione elettronica (integrazione SDI via provider accreditato).
 - P2: Toggle Direttiva 93/42/CEE vs Regolamento UE 2017/745 (MDR).
 - P2: Barcode/QR sul PDF.
 - P3: Attivazione reale provider firma/PEC/conservazione (richiede integration_expert + credenziali utente).
