@@ -597,7 +597,7 @@ export async function exportSingleProtocolPdf(protocol: ProtocolItem, lab: LabPr
  * FATTURAZIONE — Fattura (documento fiscale, esente IVA art. 10) e
  * Cedolino pre-fattura (documento riepilogativo NON fiscale per lo studio).
  * ========================================================================= */
-export type InvoiceLineData = { description?: string; qty?: number; unit_price?: number; mode?: string; declaration_id?: string };
+export type InvoiceLineData = { description?: string; qty?: number; unit_price?: number; mode?: string; declaration_id?: string; patient_name?: string; codice_lavoro?: string };
 export type InvoiceData = {
   number?: string;
   date?: string;
@@ -747,6 +747,29 @@ export function buildInvoiceHtml(inv: InvoiceData, lab: LabProfile): string {
 </html>`;
 }
 
+function cedolinoLinesHtml(inv: InvoiceData) {
+  const rows = (inv.lines || [])
+    .map((l) => {
+      const qty = Number(l.qty || 0);
+      const price = Number(l.unit_price || 0);
+      const tot = qty * price;
+      return `<tr>
+        <td>${escapeHtml(l.patient_name || "—")}</td>
+        <td>${escapeHtml(l.codice_lavoro || "—")}</td>
+        <td>${escapeHtml(l.description || "—")}</td>
+        <td class="num">${qty.toLocaleString("it-IT")}</td>
+        <td class="num">${fmtEur(price)}</td>
+        <td class="num">${fmtEur(tot)}</td>
+      </tr>`;
+    })
+    .join("");
+  return `
+  <table class="lines">
+    <thead><tr><th>Paziente</th><th>Codice</th><th>Tipo di lavorazione</th><th class="num">Elem.</th><th class="num">Prezzo</th><th class="num">Importo</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="6" class="muted">Nessuna riga</td></tr>'}</tbody>
+  </table>`;
+}
+
 export function buildCedolinoHtml(inv: InvoiceData, lab: LabProfile): string {
   return `
 <!DOCTYPE html>
@@ -763,7 +786,7 @@ export function buildCedolinoHtml(inv: InvoiceData, lab: LabProfile): string {
     <h1>Cedolino pre-fattura</h1>
     <div class="doc-meta">Riferimento: ${inv.number || "—"} &nbsp;·&nbsp; Data: ${fmtDate(inv.date)}</div>
     ${invoicePartiesHtml(inv, lab)}
-    ${invoiceLinesHtml(inv)}
+    ${cedolinoLinesHtml(inv)}
     ${invoiceTotalsHtml(inv)}
     ${inv.notes ? `<div class="notes"><b>Note:</b> ${escapeHtml(inv.notes)}</div>` : ""}
     <div class="foot">Documento riepilogativo <b>non fiscale</b> consegnato allo studio a scopo di verifica dei lavori. Non sostituisce la fattura. Emesso da ${lab.lab_name || ""} il ${fmtDate(inv.date)}.</div>

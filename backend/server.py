@@ -541,6 +541,8 @@ class InvoiceLine(BaseModel):
     unit_price: float = 0
     mode: str = "flat"
     declaration_id: str = ""
+    patient_name: str = ""
+    codice_lavoro: str = ""
 
 
 class InvoiceInput(BaseModel):

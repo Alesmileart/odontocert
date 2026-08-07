@@ -15,7 +15,7 @@ type Client = { id: string; name: string; clinic: string; address: string; vat: 
 type PriceItem = { id: string; name: string; price: number; mode: "flat" | "per_element"; category?: string; subtype?: string };
 type Work = { category?: string; subtype?: string; teeth?: number[] };
 type Declaration = { id: string; number?: string; codice_lavoro?: string; patient_name?: string; device_type?: string; teeth?: number[]; works?: Work[]; status?: string; client_id?: string; client_snapshot?: { name?: string } };
-type Line = { description: string; qty: number; unit_price: number; mode: string; declaration_id: string };
+type Line = { description: string; qty: number; unit_price: number; mode: string; declaration_id: string; patient_name?: string; codice_lavoro?: string };
 
 function fmtEur(n: number) {
   return "€ " + Number(n || 0).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -91,7 +91,15 @@ export default function NewInvoice() {
         const qty = mode === "per_element" ? (count > 0 ? count : 1) : 1;
         const desc =
           `${w.category || ""}${w.subtype ? " — " + w.subtype : ""}`.trim() || d.device_type || "Dispositivo";
-        return { description: desc, qty, unit_price: match?.price || 0, mode, declaration_id: d.id };
+        return {
+          description: desc,
+          qty,
+          unit_price: match?.price || 0,
+          mode,
+          declaration_id: d.id,
+          patient_name: d.patient_name || "",
+          codice_lavoro: d.codice_lavoro || d.number || "",
+        };
       });
       return [...prev, ...newLines];
     });
