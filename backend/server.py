@@ -521,7 +521,8 @@ class PriceItem(BaseModel):
     name: str
     price: float = 0
     mode: str = "flat"        # flat (forfait) | per_element (per elemento/dente)
-    category: str = ""
+    category: str = ""        # categoria di lavorazione collegata
+    subtype: str = ""         # sottotipo di lavorazione collegato
     description: str = ""
 
 
@@ -530,6 +531,7 @@ class PriceItemInput(BaseModel):
     price: float = 0
     mode: str = "flat"
     category: str = ""
+    subtype: str = ""
     description: str = ""
 
 
@@ -588,6 +590,27 @@ async def update_price_item(item_id: str, data: PriceItemInput, user: dict = Dep
 async def delete_price_item(item_id: str, user: dict = Depends(get_current_user)):
     await db.price_items.delete_one({"id": item_id, "user_id": user["id"]})
     return {"ok": True}
+
+
+@api_router.post("/price-items/generate")
+async def generate_price_items(user: dict = Depends(get_current_user)):
+    """Crea una voce di listino (prezzo 0, per elemento) per ogni sottotipo del catalogo
+    tipi di lavorazione, saltando quelle già presenti (per categoria+sottotipo)."""
+    types = await db.work_types.find({"user_id": user["id"]}).to_list(1000)
+    existing = await db.price_items.find({"user_id": user["id"]}).to_list(5000)
+    existing_keys = {(str(e.get("category", "")).lower(), str(e.get("subtype", "")).lower()) for e in existing}
+    created = 0
+    for t in types:
+        cat = t.get("category", "")
+        for st in t.get("subtypes", []) or []:
+            key = (cat.lower(), str(st).lower())
+            if key in existing_keys:
+                continue
+            obj = PriceItem(name=st, price=0, mode="per_element", category=cat, subtype=st)
+            await db.price_items.insert_one({**obj.dict(), "user_id": user["id"], "created_at": now_iso()})
+            existing_keys.add(key)
+            created += 1
+    return {"created": created}
 
 
 # ----------------------- Fatture (invoices) routes -----------------------

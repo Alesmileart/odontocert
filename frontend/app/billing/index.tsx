@@ -18,9 +18,10 @@ type Invoice = {
   client_snapshot: { name?: string; clinic?: string };
   lines: unknown[];
 };
-type PriceItem = { id: string; name: string; price: number; mode: "flat" | "per_element"; category: string; description: string };
+type PriceItem = { id: string; name: string; price: number; mode: "flat" | "per_element"; category: string; subtype: string; description: string };
+type WorkType = { id: string; category: string; subtypes: string[]; order: number };
 
-const emptyPrice: PriceItem = { id: "", name: "", price: 0, mode: "flat", category: "", description: "" };
+const emptyPrice: PriceItem = { id: "", name: "", price: 0, mode: "per_element", category: "", subtype: "", description: "" };
 
 function fmtDate(iso?: string) {
   if (!iso) return "";
@@ -40,16 +41,23 @@ export default function Billing() {
   const [tab, setTab] = useState<"invoices" | "listino">("invoices");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [prices, setPrices] = useState<PriceItem[]>([]);
+  const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [edit, setEdit] = useState<PriceItem>(emptyPrice);
 
   const load = useCallback(async () => {
     try {
-      const [inv, pr] = await Promise.all([api.get<Invoice[]>("/invoices"), api.get<PriceItem[]>("/price-items")]);
+      const [inv, pr, wt] = await Promise.all([
+        api.get<Invoice[]>("/invoices"),
+        api.get<PriceItem[]>("/price-items"),
+        api.get<WorkType[]>("/work-types"),
+      ]);
       setInvoices(inv);
       setPrices(pr);
+      setWorkTypes(wt);
     } catch {
       /* empty */
     } finally {
@@ -79,7 +87,7 @@ export default function Billing() {
     }
     setSaving(true);
     try {
-      const body = { name: edit.name, price: edit.price, mode: edit.mode, category: edit.category, description: edit.description };
+      const body = { name: edit.name, price: edit.price, mode: edit.mode, category: edit.category, subtype: edit.subtype, description: edit.description };
       if (edit.id) await api.put(`/price-items/${edit.id}`, body);
       else await api.post("/price-items", body);
       setSheetOpen(false);
@@ -91,6 +99,21 @@ export default function Billing() {
       setSaving(false);
     }
   };
+
+  const generateFromCatalog = async () => {
+    setGenerating(true);
+    try {
+      const res = await api.post<{ created: number }>("/price-items/generate", {});
+      toast.show(res.created > 0 ? `${res.created} voci create` : "Nessuna nuova voce", "success");
+      load();
+    } catch (e) {
+      toast.show(e instanceof Error ? e.message : "Errore generazione", "error");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const editSubtypes = workTypes.find((t) => t.category === edit.category)?.subtypes || [];
 
   const removePrice = async (p: PriceItem) => {
     try {
@@ -177,9 +200,20 @@ export default function Billing() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            <AppText size={fontSize.sm} color={colors.muted} style={{ marginBottom: spacing.sm }}>
-              Voci di listino riutilizzabili nelle fatture. Ogni voce può avere prezzo forfettario o per elemento.
-            </AppText>
+            <View style={{ marginBottom: spacing.sm }}>
+              <AppText size={fontSize.sm} color={colors.muted} style={{ marginBottom: spacing.md }}>
+                Voci di listino riutilizzabili nelle fatture. Ogni voce può essere collegata a una
+                categoria/sottotipo di lavorazione e avere prezzo forfettario o per elemento.
+              </AppText>
+              <Button
+                title="Genera dal catalogo lavorazioni"
+                kind="secondary"
+                onPress={generateFromCatalog}
+                loading={generating}
+                icon={<Ionicons name="sparkles-outline" size={18} color={colors.brandPrimary} />}
+                testID="generate-price-items"
+              />
+            </View>
           }
           ListEmptyComponent={
             <EmptyState
@@ -199,6 +233,7 @@ export default function Billing() {
                   <AppText size={fontSize.sm} color={colors.muted} style={{ marginTop: 2 }}>
                     {item.mode === "per_element" ? "Per elemento" : "Forfait"}
                     {item.category ? ` · ${item.category}` : ""}
+                    {item.subtype ? ` › ${item.subtype}` : ""}
                   </AppText>
                 </View>
                 <View style={{ alignItems: "flex-end", gap: spacing.xs }}>
@@ -226,6 +261,56 @@ export default function Billing() {
         footer={<Button title="Salva" onPress={savePrice} loading={saving} testID="price-save-button" />}
       >
         <Field label="Nome voce *" value={edit.name} onChangeText={(t) => setEdit({ ...edit, name: t })} placeholder="Es. Corona in zirconia" testID="price-name-input" />
+
+        {workTypes.length > 0 && (
+          <>
+            <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.miniLabel}>
+              COLLEGA A CATEGORIA (facoltativo)
+            </AppText>
+            <View style={styles.chipWrap}>
+              {workTypes.map((t) => {
+                const active = edit.category === t.category;
+                return (
+                  <Pressable
+                    key={t.id}
+                    style={[styles.choiceChip, active && styles.choiceChipActive]}
+                    onPress={() => setEdit({ ...edit, category: active ? "" : t.category, subtype: "" })}
+                    testID={`price-category-${t.id}`}
+                  >
+                    <AppText variant="medium" size={fontSize.base} color={active ? colors.onBrandPrimary : colors.onSurface}>
+                      {t.category}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {edit.category && editSubtypes.length > 0 ? (
+              <>
+                <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.miniLabel}>
+                  SOTTOTIPO
+                </AppText>
+                <View style={styles.chipWrap}>
+                  {editSubtypes.map((s) => {
+                    const active = edit.subtype === s;
+                    return (
+                      <Pressable
+                        key={s}
+                        style={[styles.choiceChip, active && styles.choiceChipActive]}
+                        onPress={() => setEdit((e) => ({ ...e, subtype: active ? "" : s, name: e.name || s }))}
+                        testID={`price-subtype-${s}`}
+                      >
+                        <AppText variant="medium" size={fontSize.base} color={active ? colors.onBrandPrimary : colors.onSurface}>
+                          {s}
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
+            ) : null}
+          </>
+        )}
+
         <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.miniLabel}>
           TIPO PREZZO
         </AppText>
@@ -249,7 +334,6 @@ export default function Billing() {
           keyboardType="decimal-pad"
           testID="price-value-input"
         />
-        <Field label="Categoria" value={edit.category} onChangeText={(t) => setEdit({ ...edit, category: t })} placeholder="Es. Protesi fissa" testID="price-category-input" />
         <Field label="Descrizione" value={edit.description} onChangeText={(t) => setEdit({ ...edit, description: t })} placeholder="Dettagli opzionali" multiline testID="price-description-input" />
         <View style={{ height: spacing.lg }} />
       </FormSheet>
@@ -289,6 +373,16 @@ const styles = StyleSheet.create({
   listContent: { padding: spacing.xl, gap: spacing.md, paddingBottom: 120 },
   card: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   miniLabel: { letterSpacing: 0.5, marginBottom: spacing.sm, marginTop: spacing.xs },
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.sm },
+  choiceChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceTertiary,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  choiceChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
   modeRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
   modeBtn: {
     flex: 1,

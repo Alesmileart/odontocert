@@ -12,8 +12,9 @@ import { useToast } from "@/src/components/Toast";
 import { colors, fontSize, spacing, radius } from "@/src/theme";
 
 type Client = { id: string; name: string; clinic: string; address: string; vat: string; email: string; phone: string };
-type PriceItem = { id: string; name: string; price: number; mode: "flat" | "per_element" };
-type Declaration = { id: string; number?: string; codice_lavoro?: string; patient_name?: string; device_type?: string; teeth?: number[]; client_id?: string; client_snapshot?: { name?: string } };
+type PriceItem = { id: string; name: string; price: number; mode: "flat" | "per_element"; category?: string; subtype?: string };
+type Work = { category?: string; subtype?: string; teeth?: number[] };
+type Declaration = { id: string; number?: string; codice_lavoro?: string; patient_name?: string; device_type?: string; teeth?: number[]; works?: Work[]; status?: string; client_id?: string; client_snapshot?: { name?: string } };
 type Line = { description: string; qty: number; unit_price: number; mode: string; declaration_id: string };
 
 function fmtEur(n: number) {
@@ -60,7 +61,9 @@ export default function NewInvoice() {
   const clientDeclarations = useMemo(() => {
     if (!selectedClient) return [];
     return declarations.filter(
-      (d) => d.client_id === selectedClient.id || d.client_snapshot?.name === selectedClient.name
+      (d) =>
+        d.status === "issued" &&
+        (d.client_id === selectedClient.id || d.client_snapshot?.name === selectedClient.name)
     );
   }, [declarations, selectedClient]);
 
@@ -75,11 +78,22 @@ export default function NewInvoice() {
 
   const toggleDeclarationLine = (d: Declaration) => {
     setLines((prev) => {
-      const idx = prev.findIndex((l) => l.declaration_id === d.id);
-      if (idx >= 0) return prev.filter((_, i) => i !== idx);
-      const count = (d.teeth || []).length;
-      const desc = `${d.device_type || "Dispositivo"} — ${d.patient_name || ""}${d.codice_lavoro ? ` (${d.codice_lavoro})` : ""}`.trim();
-      return [...prev, { description: desc, qty: count > 0 ? count : 1, unit_price: 0, mode: count > 0 ? "per_element" : "flat", declaration_id: d.id }];
+      const linked = prev.some((l) => l.declaration_id === d.id);
+      if (linked) return prev.filter((l) => l.declaration_id !== d.id);
+      const works: Work[] =
+        d.works && d.works.length ? d.works : [{ category: d.device_type || "", subtype: "", teeth: d.teeth || [] }];
+      const newLines: Line[] = works.map((w) => {
+        const match =
+          prices.find((p) => p.subtype && p.subtype.toLowerCase() === (w.subtype || "").toLowerCase()) ||
+          prices.find((p) => p.category && p.category.toLowerCase() === (w.category || "").toLowerCase() && !p.subtype);
+        const count = (w.teeth || []).length;
+        const mode = match?.mode || "per_element";
+        const qty = mode === "per_element" ? (count > 0 ? count : 1) : 1;
+        const desc =
+          `${w.category || ""}${w.subtype ? " — " + w.subtype : ""}`.trim() || d.device_type || "Dispositivo";
+        return { description: desc, qty, unit_price: match?.price || 0, mode, declaration_id: d.id };
+      });
+      return [...prev, ...newLines];
     });
   };
 
