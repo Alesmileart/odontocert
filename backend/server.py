@@ -204,6 +204,12 @@ class Conformity(BaseModel):
     notes: str = ""
 
 
+class WorkItem(BaseModel):
+    category: str = ""
+    subtype: str = ""
+    teeth: List[int] = []
+
+
 class DeclarationInput(BaseModel):
     client_id: Optional[str] = None
     client_snapshot: dict = {}
@@ -213,7 +219,8 @@ class DeclarationInput(BaseModel):
     patient_ref: str = ""
     device_type: str = ""          # identificato come (es. "PROTESI PROVVISORIA")
     device_description: str = ""   # dettaglio (es. "PROVVISORIO AVVITATO")
-    teeth: List[int] = []          # elementi dentali FDI selezionati
+    teeth: List[int] = []          # elementi dentali FDI selezionati (unione di tutte le lavorazioni)
+    works: List[WorkItem] = []     # più lavorazioni per lo stesso paziente
     # Prescrizione
     prescription_code: str = ""
     prescription_date: str = ""
@@ -431,6 +438,80 @@ async def update_protocol(protocol_id: str, data: ProtocolInput, user: dict = De
 @api_router.delete("/protocols/{protocol_id}")
 async def delete_protocol(protocol_id: str, user: dict = Depends(get_current_user)):
     await db.protocols.delete_one({"id": protocol_id, "user_id": user["id"]})
+    return {"ok": True}
+
+
+# ----------------------- Tipi di lavorazione (catalogo categoria -> sottotipi) -----------------------
+class WorkType(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    category: str
+    subtypes: List[str] = []
+    order: int = 0
+
+
+class WorkTypeInput(BaseModel):
+    category: str
+    subtypes: List[str] = []
+    order: int = 0
+
+
+DEFAULT_WORK_TYPES = [
+    {
+        "category": "Protesi Fissa",
+        "subtypes": [
+            "Corona in Zirconia Monolitica",
+            "Corona in Zirconia Stratificata",
+            "Corona Avvitata",
+            "Intarsio in Composito",
+        ],
+        "order": 1,
+    },
+    {
+        "category": "Protesi Provvisoria",
+        "subtypes": [
+            "Provvisorio",
+            "Provvisorio Prelimatura",
+            "Provvisorio Armato",
+            "Provvisorio Rinforzato",
+        ],
+        "order": 2,
+    },
+]
+
+
+@api_router.get("/work-types", response_model=List[WorkType])
+async def list_work_types(user: dict = Depends(get_current_user)):
+    docs = await db.work_types.find({"user_id": user["id"]}).sort([("order", 1), ("category", 1)]).to_list(1000)
+    if not docs:
+        # Seed dei predefiniti alla prima apertura
+        seeded = []
+        for t in DEFAULT_WORK_TYPES:
+            obj = WorkType(**t)
+            await db.work_types.insert_one({**obj.dict(), "user_id": user["id"], "created_at": now_iso()})
+            seeded.append(obj)
+        return seeded
+    return [WorkType(**{k: v for k in WorkType.model_fields.keys() if (v := d.get(k)) is not None}) for d in docs]
+
+
+@api_router.post("/work-types", response_model=WorkType, status_code=201)
+async def create_work_type(data: WorkTypeInput, user: dict = Depends(get_current_user)):
+    obj = WorkType(**data.dict())
+    await db.work_types.insert_one({**obj.dict(), "user_id": user["id"], "created_at": now_iso()})
+    return obj
+
+
+@api_router.put("/work-types/{type_id}", response_model=WorkType)
+async def update_work_type(type_id: str, data: WorkTypeInput, user: dict = Depends(get_current_user)):
+    doc = await db.work_types.find_one({"id": type_id, "user_id": user["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Tipo di lavorazione non trovato")
+    await db.work_types.update_one({"id": type_id, "user_id": user["id"]}, {"$set": data.dict()})
+    return WorkType(id=type_id, **data.dict())
+
+
+@api_router.delete("/work-types/{type_id}")
+async def delete_work_type(type_id: str, user: dict = Depends(get_current_user)):
+    await db.work_types.delete_one({"id": type_id, "user_id": user["id"]})
     return {"ok": True}
 
 

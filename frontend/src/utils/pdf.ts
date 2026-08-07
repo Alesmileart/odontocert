@@ -14,6 +14,7 @@ export type DeclarationData = {
   device_type?: string;
   device_description?: string;
   teeth?: number[];
+  works?: { category?: string; subtype?: string; teeth?: number[] }[];
   prescription_code?: string;
   prescription_date?: string;
   prescriber?: string;
@@ -117,6 +118,19 @@ export function buildDeclarationHtml(d: DeclarationData, lab: LabProfile): strin
 
   const deviceLine = [d.device_type, d.device_description].filter(Boolean).join(" &gt;&gt; ");
 
+  const worksArr = d.works && d.works.length ? d.works : null;
+  const worksHtml = worksArr
+    ? worksArr
+        .map((w) => {
+          const sel = new Set(w.teeth || []);
+          const title = `${w.category || ""}${w.subtype ? " &mdash; " + w.subtype : ""}`;
+          return `<div class="work"><div class="work-line">${title || "—"}</div>
+      <table class="teeth">${toothCells(UPPER_TEETH, sel, true)}${toothCells(LOWER_TEETH, sel, false)}</table></div>`;
+        })
+        .join("")
+    : `<div class="strong" style="margin:2px 0 4px">${deviceLine || "—"}</div>
+    <table class="teeth">${toothCells(UPPER_TEETH, selected, true)}${toothCells(LOWER_TEETH, selected, false)}</table>`;
+
   const storageItems = [
     d.storage_no_flip ? "Non capovolgere la confezione" : null,
     d.storage_no_shake ? "Non sbattere l'involucro" : null,
@@ -163,6 +177,8 @@ export function buildDeclarationHtml(d: DeclarationData, lab: LabProfile): strin
   table.teeth td.tnum { width: 22px; height: 11px; font-size: 8px; color: #111; border: none; padding: 0; }
   table.teeth td.tbox { width: 22px; height: 17px; border: 1px solid #111; font-size: 11px; font-weight: bold; line-height: 15px; }
   table.teeth td.tspace { width: 10px; border: none; }
+  .work { margin: 5px 0; }
+  .work-line { text-align: center; font-weight: bold; margin: 4px 0 1px; }
   .section-bar { background: #eee; border-top: 1px solid #333; border-bottom: 1px solid #333; text-align: center; font-weight: bold; padding: 2px; margin-top: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
   .section-body { text-align: justify; padding: 3px 2px; }
   .matlist { margin-top: 3px; }
@@ -208,12 +224,7 @@ export function buildDeclarationHtml(d: DeclarationData, lab: LabProfile): strin
 
     <div class="kv"><b>Codice lavoro:</b> <span class="strong">${d.codice_lavoro || d.number || "—"}</span></div>
     <div class="kv"><b>Il dispositivo è identificato come:</b></div>
-    <div class="strong" style="margin:2px 0 4px">${deviceLine || "—"}</div>
-
-    <table class="teeth">
-      ${toothCells(UPPER_TEETH, selected, true)}
-      ${toothCells(LOWER_TEETH, selected, false)}
-    </table>
+    ${worksHtml}
 
     <div class="kv">E' stato realizzato ed è destinato esclusivamente per il paziente:</div>
     <div class="strong">${d.patient_name || d.patient_ref || "—"}</div>
@@ -296,6 +307,17 @@ export function buildPrescriptionHtml(d: DeclarationData, lab: LabProfile): stri
   const selected = new Set(d.teeth || []);
   const client = d.client_snapshot || {};
   const deviceLine = [d.device_type, d.device_description].filter(Boolean).join(" &gt;&gt; ");
+  const worksArrP = d.works && d.works.length ? d.works : null;
+  const worksHtmlP = worksArrP
+    ? worksArrP
+        .map((w) => {
+          const sel = new Set(w.teeth || []);
+          const title = `${w.category || ""}${w.subtype ? " &mdash; " + w.subtype : ""}`;
+          return `<div class="work"><div class="work-line">${title || "—"}</div>
+      <table class="teeth">${toothCells(UPPER_TEETH, sel, true)}${toothCells(LOWER_TEETH, sel, false)}</table></div>`;
+        })
+        .join("")
+    : null;
   const materialsList =
     (d.materials || []).length > 0
       ? `<div class="matlist">${(d.materials || [])
@@ -330,6 +352,8 @@ export function buildPrescriptionHtml(d: DeclarationData, lab: LabProfile): stri
   table.teeth td.tnum { width: 24px; height: 14px; font-size: 9px; color: #111; border: none; padding: 1px 0; }
   table.teeth td.tbox { width: 24px; height: 22px; border: 1px solid #111; font-size: 13px; font-weight: bold; line-height: 20px; }
   table.teeth td.tspace { width: 12px; border: none; }
+  .work { margin: 8px 0; }
+  .work-line { text-align: center; font-weight: bold; margin: 6px 0 2px; }
   .matlist { margin-top: 4px; }
   .matchip { display: inline-block; border: 1px solid #999; border-radius: 3px; padding: 1px 6px; margin: 2px 3px 2px 0; font-size: 10px; }
   .muted { color: #777; }
@@ -366,14 +390,13 @@ export function buildPrescriptionHtml(d: DeclarationData, lab: LabProfile): stri
   }</div>
     <div class="kv"><b>Paziente:</b> <span class="strong">${d.patient_name || d.patient_ref || "—"}</span></div>
 
-    <div class="section-bar">Elementi dentali interessati</div>
-    <table class="teeth">
-      ${toothCells(UPPER_TEETH, selected, true)}
-      ${toothCells(LOWER_TEETH, selected, false)}
-    </table>
-
-    <div class="section-bar">Dispositivo richiesto</div>
-    <div class="strong" style="margin:4px 0">${deviceLine || "—"}</div>
+    <div class="section-bar">Lavorazioni ed elementi dentali richiesti</div>
+    ${
+      worksHtmlP
+        ? worksHtmlP
+        : `<div class="strong" style="margin:4px 0 8px">${deviceLine || "—"}</div>
+    <table class="teeth">${toothCells(UPPER_TEETH, selected, true)}${toothCells(LOWER_TEETH, selected, false)}</table>`
+    }
 
     <div class="section-bar">Materiali / indicazioni</div>
     ${materialsList}

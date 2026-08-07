@@ -17,9 +17,12 @@ import { colors, fontSize, spacing, radius } from "@/src/theme";
 type Client = { id: string; name: string; clinic: string; address: string; vat: string; email: string; phone: string };
 type Material = { id: string; name: string; manufacturer: string; ce_number: string; lot_default: string; category: string; track_stock?: boolean; unit?: string };
 type DeclMaterial = { name: string; manufacturer: string; ce_number: string; lot: string; category: string; material_id: string; qty: number; unit: string };
+type WorkType = { id: string; category: string; subtypes: string[]; order: number };
+type WorkItem = { category: string; subtype: string; teeth: number[] };
 
-const STEPS = ["Lavoro", "Arcata", "Prescrizione", "Etichetta", "Firma"];
+const STEPS = ["Lavoro", "Lavorazioni", "Prescrizione", "Etichetta", "Firma"];
 const emptyMat: DeclMaterial = { name: "", manufacturer: "", ce_number: "", lot: "", category: "", material_id: "", qty: 0, unit: "" };
+const emptyWork: WorkItem = { category: "", subtype: "", teeth: [] };
 
 export default function NewDeclaration() {
   const insets = useSafeAreaInsets();
@@ -37,10 +40,11 @@ export default function NewDeclaration() {
   // Step 1 — Lavoro & paziente
   const [codiceLavoro, setCodiceLavoro] = useState("");
   const [patientName, setPatientName] = useState("");
-  const [deviceType, setDeviceType] = useState("");
-  const [deviceDescription, setDeviceDescription] = useState("");
-  // Step 2 — Arcata
-  const [teeth, setTeeth] = useState<number[]>([]);
+  // Step 2 — Lavorazioni (categoria + sottotipo + denti per ciascuna)
+  const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
+  const [works, setWorks] = useState<WorkItem[]>([]);
+  const [workEditor, setWorkEditor] = useState<WorkItem | null>(null);
+  const [workEditIdx, setWorkEditIdx] = useState<number | null>(null);
   // Step 3 — Prescrizione & materiali
   const [prescriptionCode, setPrescriptionCode] = useState("");
   const [prescriptionDate, setPrescriptionDate] = useState("");
@@ -62,9 +66,14 @@ export default function NewDeclaration() {
 
   const load = useCallback(async () => {
     try {
-      const [c, m] = await Promise.all([api.get<Client[]>("/clients"), api.get<Material[]>("/materials")]);
+      const [c, m, wt] = await Promise.all([
+        api.get<Client[]>("/clients"),
+        api.get<Material[]>("/materials"),
+        api.get<WorkType[]>("/work-types"),
+      ]);
       setClients(c);
       setLibMaterials(m);
+      setWorkTypes(wt);
     } catch {
       /* empty */
     }
@@ -74,9 +83,23 @@ export default function NewDeclaration() {
       try {
         const src = await api.get<any>(`/declarations/${from}`);
         setPatientName(src.patient_name || src.patient_ref || "");
-        setDeviceType(src.device_type || "");
-        setDeviceDescription(src.device_description || "");
-        setTeeth(Array.isArray(src.teeth) ? src.teeth : []);
+        if (Array.isArray(src.works) && src.works.length > 0) {
+          setWorks(
+            src.works.map((w: any) => ({
+              category: w.category || "",
+              subtype: w.subtype || "",
+              teeth: Array.isArray(w.teeth) ? w.teeth : [],
+            }))
+          );
+        } else if (src.device_type || src.device_description || (src.teeth || []).length) {
+          setWorks([
+            {
+              category: src.device_type || "",
+              subtype: src.device_description || "",
+              teeth: Array.isArray(src.teeth) ? src.teeth : [],
+            },
+          ]);
+        }
         setPrescriptionCode(src.prescription_code || "");
         setPrescriber(src.prescriber || src.client_snapshot?.name || "");
         setMaterials(
@@ -190,56 +213,101 @@ export default function NewDeclaration() {
   const updateQty = (idx: number, qtyText: string) =>
     setMaterials((prev) => prev.map((m, i) => (i === idx ? { ...m, qty: parseFloat(qtyText.replace(",", ".")) || 0 } : m)));
 
+  // --- Lavorazioni ---
+  const startNewWork = () => {
+    setWorkEditIdx(null);
+    setWorkEditor({ ...emptyWork });
+  };
+  const startEditWork = (idx: number) => {
+    setWorkEditIdx(idx);
+    setWorkEditor({ ...works[idx], teeth: [...works[idx].teeth] });
+  };
+  const cancelWork = () => {
+    setWorkEditor(null);
+    setWorkEditIdx(null);
+  };
+  const saveWork = () => {
+    if (!workEditor || !workEditor.category) {
+      toast.show("Scegli la categoria di lavorazione", "error");
+      return;
+    }
+    setWorks((prev) => {
+      if (workEditIdx === null) return [...prev, workEditor];
+      return prev.map((w, i) => (i === workEditIdx ? workEditor : w));
+    });
+    setWorkEditor(null);
+    setWorkEditIdx(null);
+  };
+  const removeWork = (idx: number) => setWorks((prev) => prev.filter((_, i) => i !== idx));
+
+  const editorSubtypes = workEditor
+    ? workTypes.find((t) => t.category === workEditor.category)?.subtypes || []
+    : [];
+
   const canNext = () => {
-    if (step === 0) return !!patientName.trim() && !!deviceType.trim();
+    if (step === 0) return !!patientName.trim();
+    if (step === 1) return works.length > 0;
     return true;
   };
 
   const goNext = () => {
     if (!canNext()) {
-      toast.show("Inserisci il paziente e l'identificazione del dispositivo", "error");
+      if (step === 0) toast.show("Inserisci il nome del paziente", "error");
+      else if (step === 1) toast.show("Aggiungi almeno una lavorazione", "error");
+      return;
+    }
+    if (step === 1 && workEditor) {
+      toast.show("Salva o annulla la lavorazione in corso", "error");
       return;
     }
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
 
   const goBack = () => {
+    if (step === 1 && workEditor) {
+      cancelWork();
+      return;
+    }
     if (step === 0) router.back();
     else setStep((s) => s - 1);
   };
 
-  const buildPayload = (signature: string) => ({
-    client_id: selectedClient?.id ?? null,
-    client_snapshot: selectedClient
-      ? {
-          name: selectedClient.name,
-          clinic: selectedClient.clinic,
-          address: selectedClient.address,
-          vat: selectedClient.vat,
-          email: selectedClient.email,
-          phone: selectedClient.phone,
-        }
-      : { name: prescriber },
-    codice_lavoro: codiceLavoro,
-    patient_name: patientName,
-    patient_ref: patientName,
-    device_type: deviceType,
-    device_description: deviceDescription,
-    teeth,
-    prescription_code: prescriptionCode,
-    prescription_date: prescriptionDate,
-    prescriber,
-    materials,
-    annotations,
-    delivery_date: deliveryDate,
-    usage_days: usageDays,
-    storage_no_flip: storage.no_flip,
-    storage_no_shake: storage.no_shake,
-    storage_proper_place: storage.proper_place,
-    non_sterile: storage.non_sterile,
-    technician_name: technicianName,
-    signature_base64: signature,
-  });
+  const buildPayload = (signature: string) => {
+    const allTeeth = Array.from(new Set(works.flatMap((w) => w.teeth)));
+    return {
+      client_id: selectedClient?.id ?? null,
+      client_snapshot: selectedClient
+        ? {
+            name: selectedClient.name,
+            clinic: selectedClient.clinic,
+            address: selectedClient.address,
+            vat: selectedClient.vat,
+            email: selectedClient.email,
+            phone: selectedClient.phone,
+          }
+        : { name: prescriber },
+      codice_lavoro: codiceLavoro,
+      patient_name: patientName,
+      patient_ref: patientName,
+      device_type: works.map((w) => w.category).filter(Boolean).join(", "),
+      device_description: works.map((w) => w.subtype).filter(Boolean).join(" · "),
+      teeth: allTeeth,
+      works,
+      prescription_code: prescriptionCode,
+      prescription_date: prescriptionDate,
+      prescriber,
+      materials,
+      annotations,
+      delivery_date: deliveryDate,
+      usage_days: usageDays,
+      storage_no_flip: storage.no_flip,
+      storage_no_shake: storage.no_shake,
+      storage_proper_place: storage.proper_place,
+      non_sterile: storage.non_sterile,
+      technician_name: technicianName,
+      signature_base64: signature,
+    };
+  };
 
   const submit = async (signature: string) => {
     setSaving(true);
@@ -313,25 +381,154 @@ export default function NewDeclaration() {
               </AppText>
               <Field label="Codice lavoro" value={codiceLavoro} onChangeText={setCodiceLavoro} placeholder="Automatico (es. 0023/2026)" mono autoCapitalize="characters" testID="decl-codice-lavoro" />
               <Field label="Paziente (nome e cognome) *" value={patientName} onChangeText={setPatientName} placeholder="Es. Livesu Anna" autoCapitalize="words" testID="decl-patient-name" />
-              <Field label="Dispositivo identificato come *" value={deviceType} onChangeText={setDeviceType} placeholder="Es. PROTESI PROVVISORIA" autoCapitalize="characters" testID="decl-device-type" />
-              <Field label="Dettaglio dispositivo" value={deviceDescription} onChangeText={setDeviceDescription} placeholder="Es. PROVVISORIO AVVITATO" autoCapitalize="characters" testID="decl-device-description" />
+              <AppText size={fontSize.sm} color={colors.muted}>
+                Nel passo successivo aggiungi una o più lavorazioni per questo paziente.
+              </AppText>
             </>
           )}
 
-          {step === 1 && (
+          {step === 1 && !workEditor && (
+            <>
+              <View style={styles.worksHead}>
+                <AppText variant="bold" size={fontSize.xl}>
+                  Lavorazioni
+                </AppText>
+                <Pressable onPress={() => router.push("/work-types")} hitSlop={8} testID="manage-work-types">
+                  <AppText variant="semibold" size={fontSize.sm} color={colors.brandPrimary}>
+                    Gestisci tipi
+                  </AppText>
+                </Pressable>
+              </View>
+              <AppText size={fontSize.base} color={colors.muted} style={{ marginBottom: spacing.md }}>
+                Aggiungi le lavorazioni per {patientName || "il paziente"}. Ogni lavorazione ha categoria,
+                sottotipo ed i suoi elementi dentali.
+              </AppText>
+
+              {works.length === 0 ? (
+                <Card style={styles.matEmpty}>
+                  <Ionicons name="construct-outline" size={26} color={colors.muted} />
+                  <AppText size={fontSize.base} color={colors.muted} style={{ marginTop: spacing.sm, textAlign: "center" }}>
+                    Nessuna lavorazione aggiunta.
+                  </AppText>
+                </Card>
+              ) : (
+                <View style={styles.matList}>
+                  {works.map((w, idx) => (
+                    <Card key={idx} style={styles.matCard}>
+                      <View style={styles.matCardTop}>
+                        <View style={{ flex: 1 }}>
+                          <AppText variant="semibold" size={fontSize.base}>
+                            {w.category || "—"}
+                          </AppText>
+                          {w.subtype ? (
+                            <AppText size={fontSize.sm} color={colors.brandPrimary}>
+                              {w.subtype}
+                            </AppText>
+                          ) : null}
+                          <AppText variant="mono" size={fontSize.sm} color={colors.muted} style={{ marginTop: 2 }}>
+                            {w.teeth.length > 0 ? `Denti: ${[...w.teeth].sort((a, b) => a - b).join(", ")}` : "Nessun elemento"}
+                          </AppText>
+                        </View>
+                        <View style={{ flexDirection: "row", gap: spacing.md }}>
+                          <Pressable onPress={() => startEditWork(idx)} hitSlop={10} testID={`edit-work-${idx}`}>
+                            <Ionicons name="create-outline" size={22} color={colors.brandPrimary} />
+                          </Pressable>
+                          <Pressable onPress={() => removeWork(idx)} hitSlop={10} testID={`remove-work-${idx}`}>
+                            <Ionicons name="close-circle" size={22} color={colors.error} />
+                          </Pressable>
+                        </View>
+                      </View>
+                    </Card>
+                  ))}
+                </View>
+              )}
+
+              <Pressable style={styles.addManual} onPress={startNewWork} testID="add-work">
+                <Ionicons name="add-circle-outline" size={20} color={colors.brandPrimary} />
+                <AppText variant="semibold" size={fontSize.base} color={colors.brandPrimary}>
+                  Aggiungi lavorazione
+                </AppText>
+              </Pressable>
+            </>
+          )}
+
+          {step === 1 && workEditor && (
             <>
               <AppText variant="bold" size={fontSize.xl} style={styles.stepTitle}>
-                Elementi dentali
+                {workEditIdx === null ? "Nuova lavorazione" : "Modifica lavorazione"}
               </AppText>
-              <AppText size={fontSize.base} color={colors.muted} style={{ marginBottom: spacing.md }}>
-                Tocca i denti interessati dal dispositivo (numerazione FDI).
+
+              <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.miniLabel}>
+                CATEGORIA
               </AppText>
-              <ToothChart selected={teeth} onChange={setTeeth} />
-              {teeth.length > 0 ? (
-                <AppText size={fontSize.sm} color={colors.brandPrimary} style={{ marginTop: spacing.md }}>
-                  Selezionati: {[...teeth].sort((a, b) => a - b).join(", ")}
+              {workTypes.length === 0 ? (
+                <AppText size={fontSize.sm} color={colors.muted}>
+                  Nessuna categoria. Aggiungile in “Gestisci tipi”.
                 </AppText>
+              ) : (
+                <View style={styles.chipWrap}>
+                  {workTypes.map((t) => {
+                    const active = workEditor.category === t.category;
+                    return (
+                      <Pressable
+                        key={t.id}
+                        style={[styles.choiceChip, active && styles.choiceChipActive]}
+                        onPress={() => setWorkEditor({ ...workEditor, category: t.category, subtype: "" })}
+                        testID={`work-category-${t.id}`}
+                      >
+                        <AppText variant="medium" size={fontSize.base} color={active ? colors.onBrandPrimary : colors.onSurface}>
+                          {t.category}
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+
+              {workEditor.category ? (
+                <>
+                  <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.miniLabel}>
+                    SOTTOTIPO
+                  </AppText>
+                  {editorSubtypes.length === 0 ? (
+                    <AppText size={fontSize.sm} color={colors.muted}>
+                      Nessun sottotipo per questa categoria.
+                    </AppText>
+                  ) : (
+                    <View style={styles.chipWrap}>
+                      {editorSubtypes.map((s) => {
+                        const active = workEditor.subtype === s;
+                        return (
+                          <Pressable
+                            key={s}
+                            style={[styles.choiceChip, active && styles.choiceChipActive]}
+                            onPress={() => setWorkEditor({ ...workEditor, subtype: s })}
+                            testID={`work-subtype-${s}`}
+                          >
+                            <AppText variant="medium" size={fontSize.base} color={active ? colors.onBrandPrimary : colors.onSurface}>
+                              {s}
+                            </AppText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
+                </>
               ) : null}
+
+              <AppText variant="medium" size={fontSize.sm} color={colors.muted} style={styles.miniLabel}>
+                ELEMENTI DENTALI
+              </AppText>
+              <ToothChart selected={workEditor.teeth} onChange={(t) => setWorkEditor({ ...workEditor, teeth: t })} />
+
+              <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.lg }}>
+                <View style={{ flex: 1 }}>
+                  <Button title="Annulla" kind="secondary" onPress={cancelWork} testID="work-cancel" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button title="Salva lavorazione" onPress={saveWork} testID="work-save" />
+                </View>
+              </View>
             </>
           )}
 
@@ -467,7 +664,7 @@ export default function NewDeclaration() {
             <Button title="Firma ed emetti" onPress={issue} loading={saving} testID="issue-declaration-button" />
             <Button title="Salva come bozza" kind="secondary" onPress={() => submit("")} disabled={saving} testID="save-draft-button" />
           </View>
-        ) : (
+        ) : step === 1 && workEditor ? null : (
           <Button title="Continua" onPress={goNext} testID="wizard-next-button" />
         )}
       </View>
@@ -532,6 +729,17 @@ const styles = StyleSheet.create({
   body: { padding: spacing.xl, paddingBottom: spacing["3xl"] },
   signStep: { flex: 1, padding: spacing.xl },
   stepTitle: { marginBottom: spacing.lg },
+  worksHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xs },
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.sm },
+  choiceChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceTertiary,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  choiceChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
   miniLabel: { letterSpacing: 0.5, marginBottom: spacing.sm, marginTop: spacing.md },
   libRow: { gap: spacing.sm, paddingBottom: spacing.lg },
   libPill: {

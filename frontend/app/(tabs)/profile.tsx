@@ -146,6 +146,21 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </Pressable>
 
+        <Pressable style={styles.navRow} onPress={() => router.push("/work-types")} testID="open-work-types">
+          <View style={styles.navIcon}>
+            <Ionicons name="construct-outline" size={20} color={colors.brandPrimary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppText variant="semibold" size={fontSize.base}>
+              Tipi di lavorazione
+            </AppText>
+            <AppText size={fontSize.sm} color={colors.muted}>
+              Categorie e sottotipi per le dichiarazioni
+            </AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+        </Pressable>
+
         <Pressable style={styles.navRow} onPress={() => router.push("/billing")} testID="open-billing">
           <View style={styles.navIcon}>
             <Ionicons name="receipt-outline" size={20} color={colors.brandPrimary} />
