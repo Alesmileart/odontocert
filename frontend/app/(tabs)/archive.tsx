@@ -10,6 +10,8 @@ import { AppText, Card, Badge, Button } from "@/src/components/ui";
 import { FormSheet } from "@/src/components/FormSheet";
 import { DateField } from "@/src/components/DateField";
 import { api } from "@/src/api/client";
+import { useToast } from "@/src/components/Toast";
+import { exportDeclarationsBatchPdf, LabProfile, DeclarationData } from "@/src/utils/pdf";
 import { colors, fontSize, spacing, radius } from "@/src/theme";
 
 dayjs.extend(customParseFormat);
@@ -51,7 +53,9 @@ function fmtDate(iso: string) {
 export default function Archive() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const toast = useToast();
   const [items, setItems] = useState<Decl[]>([]);
+  const [lab, setLab] = useState<LabProfile>({});
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -59,11 +63,16 @@ export default function Archive() {
   const [prescriberFilter, setPrescriberFilter] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  // Selezione multipla
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [batchBusy, setBatchBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const data = await api.get<Decl[]>("/declarations");
+      const [data, prof] = await Promise.all([api.get<Decl[]>("/declarations"), api.get<LabProfile>("/profile")]);
       setItems(data);
+      setLab(prof);
     } catch {
       /* empty */
     } finally {
@@ -121,13 +130,79 @@ export default function Archive() {
     });
   }, [items, query, filter, prescriberFilter, dateFrom, dateTo]);
 
+  const selectableFiltered = useMemo(() => filtered.filter((d) => d.status === "issued"), [filtered]);
+
+  const enterSelect = () => {
+    setSelectMode(true);
+    setSelectedIds([]);
+  };
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelectedIds([]);
+  };
+  const toggleSelect = (d: Decl) => {
+    if (d.status !== "issued") {
+      toast.show("Solo le dichiarazioni emesse sono selezionabili", "info");
+      return;
+    }
+    setSelectedIds((prev) => (prev.includes(d.id) ? prev.filter((x) => x !== d.id) : [...prev, d.id]));
+  };
+  const allSelected = selectableFiltered.length > 0 && selectedIds.length === selectableFiltered.length;
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? [] : selectableFiltered.map((d) => d.id));
+  };
+
+  const onItemPress = (d: Decl) => {
+    if (selectMode) toggleSelect(d);
+    else router.push(`/declaration/${d.id}`);
+  };
+
+  const printSelected = async () => {
+    if (selectedIds.length === 0) {
+      toast.show("Seleziona almeno una dichiarazione", "error");
+      return;
+    }
+    setBatchBusy(true);
+    try {
+      const list = items.filter((d) => selectedIds.includes(d.id)) as unknown as DeclarationData[];
+      await exportDeclarationsBatchPdf(list, lab);
+    } catch (e) {
+      toast.show(e instanceof Error ? e.message : "Errore stampa", "error");
+    } finally {
+      setBatchBusy(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Sticky header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <AppText variant="bold" size={fontSize["2xl"]} style={styles.headerTitle}>
-          Archivio
-        </AppText>
+        <View style={styles.titleRow}>
+          <AppText variant="bold" size={fontSize["2xl"]}>
+            Archivio
+          </AppText>
+          {selectMode ? (
+            <View style={styles.selHeaderActions}>
+              <Pressable onPress={toggleSelectAll} hitSlop={8} testID="select-all">
+                <AppText variant="semibold" size={fontSize.base} color={colors.brandPrimary}>
+                  {allSelected ? "Deseleziona" : "Tutte"}
+                </AppText>
+              </Pressable>
+              <Pressable onPress={exitSelect} hitSlop={8} testID="exit-select">
+                <AppText variant="semibold" size={fontSize.base} color={colors.muted}>
+                  Annulla
+                </AppText>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable onPress={enterSelect} hitSlop={8} style={styles.selectBtn} testID="enter-select">
+              <Ionicons name="checkmark-done-outline" size={18} color={colors.brandPrimary} />
+              <AppText variant="semibold" size={fontSize.base} color={colors.brandPrimary}>
+                Seleziona
+              </AppText>
+            </Pressable>
+          )}
+        </View>
         <View style={styles.searchRow}>
           <View style={styles.searchBar}>
             <Ionicons name="search" size={18} color={colors.muted} />
@@ -204,32 +279,67 @@ export default function Archive() {
               </AppText>
             </View>
           }
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => router.push(`/declaration/${item.id}`)}
-              testID={`archive-item-${item.id}`}
-            >
-              <Card style={styles.card}>
-                <View style={styles.cardTop}>
-                  <AppText variant="monoBold" size={fontSize.sm} color={colors.brandPrimary}>
-                    {item.codice_lavoro || item.number}
-                  </AppText>
-                  <Badge status={item.status} />
-                </View>
-                <AppText variant="semibold" size={fontSize.lg} style={{ marginTop: spacing.xs }}>
-                  {item.device_type || "Dispositivo"}
-                </AppText>
-                <View style={styles.meta}>
-                  <Ionicons name="person-outline" size={14} color={colors.muted} />
-                  <AppText size={fontSize.sm} color={colors.muted}>
-                    {item.patient_name || item.patient_ref || "—"} · {fmtDate(item.issue_date)}
-                  </AppText>
-                </View>
-              </Card>
-            </Pressable>
-          )}
+          renderItem={({ item }) => {
+            const checked = selectedIds.includes(item.id);
+            const selectable = item.status === "issued";
+            return (
+              <Pressable onPress={() => onItemPress(item)} testID={`archive-item-${item.id}`}>
+                <Card style={[styles.card, selectMode && checked ? styles.cardChecked : null]}>
+                  <View style={styles.cardRow}>
+                    {selectMode ? (
+                      <View
+                        style={[
+                          styles.checkCircle,
+                          checked && styles.checkCircleOn,
+                          !selectable && styles.checkCircleDisabled,
+                        ]}
+                        testID={`select-checkbox-${item.id}`}
+                      >
+                        {checked ? <Ionicons name="checkmark" size={16} color={colors.onBrandPrimary} /> : null}
+                      </View>
+                    ) : null}
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.cardTop}>
+                        <AppText variant="monoBold" size={fontSize.sm} color={colors.brandPrimary}>
+                          {item.codice_lavoro || item.number}
+                        </AppText>
+                        <Badge status={item.status} />
+                      </View>
+                      <AppText variant="semibold" size={fontSize.lg} style={{ marginTop: spacing.xs }}>
+                        {item.device_type || "Dispositivo"}
+                      </AppText>
+                      <View style={styles.meta}>
+                        <Ionicons name="person-outline" size={14} color={colors.muted} />
+                        <AppText size={fontSize.sm} color={colors.muted}>
+                          {item.patient_name || item.patient_ref || "—"} · {fmtDate(item.issue_date)}
+                        </AppText>
+                      </View>
+                    </View>
+                  </View>
+                </Card>
+              </Pressable>
+            );
+          }}
         />
       )}
+
+      {selectMode ? (
+        <View style={[styles.batchBar, { paddingBottom: insets.bottom + spacing.md }]}>
+          <AppText variant="semibold" size={fontSize.base} color={colors.onSurfaceSecondary}>
+            {selectedIds.length} selezionate
+          </AppText>
+          <View style={{ flex: 1 }}>
+            <Button
+              title="Stampa / Invia selezionate"
+              onPress={printSelected}
+              loading={batchBusy}
+              disabled={selectedIds.length === 0}
+              icon={<Ionicons name="print-outline" size={18} color={colors.onBrandPrimary} />}
+              testID="print-selected"
+            />
+          </View>
+        </View>
+      ) : null}
 
       <FormSheet
         visible={filterSheet}
@@ -305,6 +415,32 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   headerTitle: { paddingHorizontal: spacing.xl, marginBottom: spacing.md },
+  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: spacing.xl, marginBottom: spacing.md },
+  selectBtn: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  selHeaderActions: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
+  cardRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  cardChecked: { borderColor: colors.brandPrimary, borderWidth: 1.5 },
+  checkCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: colors.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkCircleOn: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
+  checkCircleDisabled: { opacity: 0.35 },
+  batchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surfaceSecondary,
+  },
   searchRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.xl },
   searchBar: {
     flex: 1,
