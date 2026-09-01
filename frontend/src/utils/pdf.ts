@@ -794,26 +794,35 @@ export function buildInvoiceHtml(inv: InvoiceData, lab: LabProfile): string {
 }
 
 function cedolinoLinesHtml(inv: InvoiceData) {
-  const rows = (inv.lines || [])
-    .map((l) => {
-      const qty = Number(l.qty || 0);
-      const price = Number(l.unit_price || 0);
-      const tot = qty * price;
-      const elems = l.teeth && l.teeth.length ? l.teeth.join(", ") : String(qty || "—");
-      return `<tr>
-        <td>${escapeHtml(l.patient_name || "—")}</td>
-        <td>${escapeHtml(l.codice_lavoro || "—")}</td>
-        <td>${escapeHtml(l.description || "—")}</td>
-        <td class="elems">${elems}</td>
+  const cell = (patient: string, codice: string, desc: string, elem: string, qty: number, price: number, tot: number) =>
+    `<tr>
+        <td>${escapeHtml(patient || "—")}</td>
+        <td>${escapeHtml(codice || "—")}</td>
+        <td>${escapeHtml(desc || "—")}</td>
+        <td class="elems">${escapeHtml(elem)}</td>
         <td class="num">${qty.toLocaleString("it-IT")}</td>
         <td class="num">${fmtEur(price)}</td>
         <td class="num">${fmtEur(tot)}</td>
       </tr>`;
+
+  const rows = (inv.lines || [])
+    .flatMap((l) => {
+      const price = Number(l.unit_price || 0);
+      const teeth = l.teeth || [];
+      // Per lavorazioni "per elemento" con denti indicati: una riga per ogni dente
+      if (l.mode !== "flat" && teeth.length > 0) {
+        return teeth.map((t) =>
+          cell(l.patient_name || "", l.codice_lavoro || "", l.description || "", `elemento ${t}`, 1, price, price)
+        );
+      }
+      const qty = Number(l.qty || 0);
+      const elem = teeth.length ? teeth.map((t) => `elemento ${t}`).join(", ") : "—";
+      return [cell(l.patient_name || "", l.codice_lavoro || "", l.description || "", elem, qty, price, qty * price)];
     })
     .join("");
   return `
   <table class="lines">
-    <thead><tr><th>Paziente</th><th>Codice</th><th>Tipo di lavorazione</th><th>Elementi</th><th class="num">Q.tà</th><th class="num">Prezzo</th><th class="num">Importo</th></tr></thead>
+    <thead><tr><th>Paziente</th><th>Codice</th><th>Tipo di lavorazione</th><th>Elemento</th><th class="num">Q.tà</th><th class="num">Prezzo</th><th class="num">Importo</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="7" class="muted">Nessuna riga</td></tr>'}</tbody>
   </table>`;
 }
