@@ -642,7 +642,7 @@ export async function exportSingleProtocolPdf(protocol: ProtocolItem, lab: LabPr
  * FATTURAZIONE — Fattura (documento fiscale, esente IVA art. 10) e
  * Cedolino pre-fattura (documento riepilogativo NON fiscale per lo studio).
  * ========================================================================= */
-export type InvoiceLineData = { description?: string; qty?: number; unit_price?: number; mode?: string; declaration_id?: string; patient_name?: string; codice_lavoro?: string };
+export type InvoiceLineData = { description?: string; qty?: number; unit_price?: number; mode?: string; declaration_id?: string; patient_name?: string; codice_lavoro?: string; teeth?: number[] };
 export type InvoiceData = {
   number?: string;
   date?: string;
@@ -682,6 +682,7 @@ function invoiceStyles() {
   table.lines th { background: #2D4A3E; color: #fff; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; padding: 7px 8px; text-align: left; }
   table.lines td { border-bottom: 1px solid #ddd; padding: 7px 8px; vertical-align: top; }
   table.lines td.num, table.lines th.num { text-align: right; white-space: nowrap; }
+  table.lines td.elems { font-family: 'Courier New', monospace; font-size: 10px; }
   .totals { margin-top: 12px; display: flex; justify-content: flex-end; }
   .totals table { border-collapse: collapse; min-width: 240px; }
   .totals td { padding: 4px 8px; }
@@ -798,10 +799,12 @@ function cedolinoLinesHtml(inv: InvoiceData) {
       const qty = Number(l.qty || 0);
       const price = Number(l.unit_price || 0);
       const tot = qty * price;
+      const elems = l.teeth && l.teeth.length ? l.teeth.join(", ") : String(qty || "—");
       return `<tr>
         <td>${escapeHtml(l.patient_name || "—")}</td>
         <td>${escapeHtml(l.codice_lavoro || "—")}</td>
         <td>${escapeHtml(l.description || "—")}</td>
+        <td class="elems">${elems}</td>
         <td class="num">${qty.toLocaleString("it-IT")}</td>
         <td class="num">${fmtEur(price)}</td>
         <td class="num">${fmtEur(tot)}</td>
@@ -810,8 +813,8 @@ function cedolinoLinesHtml(inv: InvoiceData) {
     .join("");
   return `
   <table class="lines">
-    <thead><tr><th>Paziente</th><th>Codice</th><th>Tipo di lavorazione</th><th class="num">Elem.</th><th class="num">Prezzo</th><th class="num">Importo</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="6" class="muted">Nessuna riga</td></tr>'}</tbody>
+    <thead><tr><th>Paziente</th><th>Codice</th><th>Tipo di lavorazione</th><th>Elementi</th><th class="num">Q.tà</th><th class="num">Prezzo</th><th class="num">Importo</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7" class="muted">Nessuna riga</td></tr>'}</tbody>
   </table>`;
 }
 

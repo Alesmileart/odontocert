@@ -15,7 +15,7 @@ type Client = { id: string; name: string; clinic: string; address: string; vat: 
 type PriceItem = { id: string; name: string; price: number; mode: "flat" | "per_element"; category?: string; subtype?: string };
 type Work = { category?: string; subtype?: string; teeth?: number[] };
 type Declaration = { id: string; number?: string; codice_lavoro?: string; patient_name?: string; device_type?: string; teeth?: number[]; works?: Work[]; status?: string; client_id?: string; client_snapshot?: { name?: string } };
-type Line = { description: string; qty: number; unit_price: number; mode: string; declaration_id: string; patient_name?: string; codice_lavoro?: string };
+type Line = { description: string; qty: number; unit_price: number; mode: string; declaration_id: string; patient_name?: string; codice_lavoro?: string; teeth?: number[] };
 
 function fmtEur(n: number) {
   return "€ " + Number(n || 0).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -99,6 +99,7 @@ export default function NewInvoice() {
           declaration_id: d.id,
           patient_name: d.patient_name || "",
           codice_lavoro: d.codice_lavoro || d.number || "",
+          teeth: [...(w.teeth || [])].sort((a, b) => a - b),
         };
       });
       return [...prev, ...newLines];

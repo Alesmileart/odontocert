@@ -543,6 +543,7 @@ class InvoiceLine(BaseModel):
     declaration_id: str = ""
     patient_name: str = ""
     codice_lavoro: str = ""
+    teeth: List[int] = []
 
 
 class InvoiceInput(BaseModel):
