@@ -11,7 +11,7 @@ import { useToast } from "@/src/components/Toast";
 import { buildInvoiceHtml, buildCedolinoHtml, exportInvoicePdf, InvoiceData, LabProfile } from "@/src/utils/pdf";
 import { colors, fontSize, spacing, radius } from "@/src/theme";
 
-type Line = { description: string; qty: number; unit_price: number; mode: string; declaration_id?: string };
+type Line = { description: string; qty: number; unit_price: number; mode: string; declaration_id?: string; teeth?: number[]; patient_name?: string; codice_lavoro?: string };
 type Invoice = InvoiceData & { id: string; number: string; date: string; total: number; lines: Line[]; bollo?: boolean; notes?: string };
 
 function fmtEur(n?: number) {
@@ -41,6 +41,40 @@ export default function InvoiceDetail() {
   const load = useCallback(async () => {
     try {
       const [inv, prof] = await Promise.all([api.get<Invoice>(`/invoices/${id}`), api.get<LabProfile>("/profile")]);
+      // Backfill per fatture create prima del campo denti: recupera elementi/paziente/codice
+      // dalle dichiarazioni collegate.
+      const missingIds = Array.from(
+        new Set(
+          (inv.lines || [])
+            .filter((l) => l.declaration_id && (!l.teeth || l.teeth.length === 0))
+            .map((l) => l.declaration_id as string)
+        )
+      );
+      if (missingIds.length > 0) {
+        const decls = await Promise.all(
+          missingIds.map((did) => api.get<any>(`/declarations/${did}`).catch(() => null))
+        );
+        const map: Record<string, any> = {};
+        missingIds.forEach((did, i) => {
+          if (decls[i]) map[did] = decls[i];
+        });
+        inv.lines = (inv.lines || []).map((l) => {
+          if (!l.declaration_id || (l.teeth && l.teeth.length > 0)) return l;
+          const d = map[l.declaration_id];
+          if (!d) return l;
+          const works: any[] = Array.isArray(d.works) ? d.works : [];
+          const work =
+            works.find((w) => `${w.category || ""}${w.subtype ? " — " + w.subtype : ""}` === l.description) ||
+            works.find((w) => l.description && w.subtype && l.description.includes(w.subtype));
+          const teeth = work ? work.teeth || [] : d.teeth || [];
+          return {
+            ...l,
+            teeth: [...teeth].sort((a: number, b: number) => a - b),
+            patient_name: l.patient_name || d.patient_name || d.patient_ref || "",
+            codice_lavoro: l.codice_lavoro || d.codice_lavoro || d.number || "",
+          };
+        });
+      }
       setInvoice(inv);
       setLab(prof);
     } catch {
