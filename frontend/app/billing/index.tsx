@@ -2,7 +2,7 @@ import React, { useCallback, useState } from "react";
 import { View, StyleSheet, FlatList, Pressable, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { AppText, Card, Button } from "@/src/components/ui";
 import { Field } from "@/src/components/Field";
 import { FormSheet } from "@/src/components/FormSheet";
@@ -341,7 +341,7 @@ export default function Billing() {
   );
 }
 
-function EmptyState({ icon, title, text, testID }: { icon: keyof typeof Ionicons.glyphMap; title: string; text: string; testID?: string }) {
+function EmptyState({ icon, title, text, testID }: { icon: import("react").ComponentProps<typeof Ionicons>["name"]; title: string; text: string; testID?: string }) {
   return (
     <View style={styles.empty} testID={testID}>
       <View style={styles.emptyIcon}>

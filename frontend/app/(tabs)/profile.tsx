@@ -3,7 +3,7 @@ import { View, StyleSheet, Pressable, Linking } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { AppText, Button, Card, Divider } from "@/src/components/ui";

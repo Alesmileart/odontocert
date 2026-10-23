@@ -58,3 +58,8 @@
 
 ## Next Tasks
 - Await user feedback; prioritize logo upload and PDF branding.
+
+## Expo SDK 58 upgrade (Jun 2026)
+- expo 58.0.17, react-native 0.88, react 19.3, expo-router ~58
+- @expo/vector-icons replaced by @react-native-vector-icons/ionicons; app.json cleaned (newArchEnabled/edgeToEdgeEnabled)
+- expo-doctor 20/20; frontend regression iteration_11 passed

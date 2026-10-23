@@ -3,7 +3,7 @@ import { View, StyleSheet, Pressable } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { AppText, Button, Card } from "@/src/components/ui";
 import { Field } from "@/src/components/Field";
 import { api } from "@/src/api/client";
@@ -148,7 +148,7 @@ function Section({
   children,
   testID,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: import("react").ComponentProps<typeof Ionicons>["name"];
   title: string;
   enabled: boolean;
   onToggle: () => void;

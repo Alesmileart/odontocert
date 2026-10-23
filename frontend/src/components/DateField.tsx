@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { View, StyleSheet, Pressable, Modal } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     height: 50,
   },
   backdrop: { flex: 1, justifyContent: "center", backgroundColor: "rgba(17,20,18,0.45)" },
-  backdropTap: { ...StyleSheet.absoluteFillObject },
+  backdropTap: { ...StyleSheet.absoluteFill },
   card: {
     backgroundColor: colors.surface,
     marginHorizontal: spacing.xl,

@@ -2,7 +2,7 @@ import React, { useCallback, useState } from "react";
 import { View, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { AppText, Card, Badge, Button, Divider } from "@/src/components/ui";
 import { FormSheet } from "@/src/components/FormSheet";
 import { PdfPreview } from "@/src/components/PdfPreview";
@@ -281,7 +281,7 @@ function SignatureImage({ uri }: { uri: string }) {
   return <Image source={{ uri }} style={{ width: "100%", height: 90 }} contentFit="contain" />;
 }
 
-function SectionTitle({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
+function SectionTitle({ icon, title }: { icon: import("react").ComponentProps<typeof Ionicons>["name"]; title: string }) {
   return (
     <View style={styles.sectionTitle}>
       <Ionicons name={icon} size={18} color={colors.brandPrimary} />

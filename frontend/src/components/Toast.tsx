@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useCallback, useRef, useState } from "react";
 import { StyleSheet, View, Pressable } from "react-native";
 import Animated, { FadeInUp, FadeOutUp } from "react-native-reanimated";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/ui";
 import { colors, fontSize, radius, spacing, shadow } from "@/src/theme";

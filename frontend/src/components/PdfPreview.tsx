@@ -2,7 +2,7 @@ import React from "react";
 import { Modal, View, StyleSheet, Pressable, Platform } from "react-native";
 import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { AppText, Button } from "@/src/components/ui";
 import { colors, fontSize, spacing } from "@/src/theme";
 
@@ -41,7 +41,6 @@ export function PdfPreview({
 
         <View style={styles.webWrap}>
           {Platform.OS === "web" ? (
-            // @ts-expect-error iframe is web-only DOM element
             <iframe title={title} srcDoc={source.html} style={{ width: "100%", height: "100%", border: "none", backgroundColor: "#FFFFFF" }} />
           ) : (
             <WebView

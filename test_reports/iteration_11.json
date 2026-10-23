@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend-only regression after Expo SDK 54 -> 58 upgrade (expo 58.0.17, RN 0.88, React 19.3, @react-native-vector-icons/ionicons 14). Viewport 390x844. ALL requested flows PASS with zero console errors / pageerrors and no red screen: login (tecnico@lab.it) -> Home; Archivio filter chips (Tutte/Emesse/Bozze), Filtri bottom sheet + DateField (filter-date-from) opens and closes via backdrop, Seleziona mode (4 checkboxes, select-all selects 3 issued, '3 selezionate'), print-selected triggers Print.printAsync on web without error, exit-select restores normal mode; Anagrafica segments (clients/materials); Magazzino empty state; Profilo rows Fatturazione (/billing), Tipi di lavorazione (/work-types), Impostazioni provider (/provider-settings) all navigate and back. Ionicons: font 'Ionicons' reported loaded in document.fonts, every Ionicons text node renders a PUA glyph (0 empty / 0 fallback ASCII) on all screens; visual screenshots confirm no tofu boxes. Declaration wizard /declaration/new: patient -> 2 works added (Protesi Fissa / two subtypes) -> step 3 DateField modal opens, month nav works, backdrop tap closes, day pick sets '15/10/2026' and closes; exited wizard without saving (no draft persisted, verified via API). PdfPreview: declaration iframe 'Anteprima dichiarazione' and 'Anteprima prescrizione' render with full content; preview-close works. Billing: seeded TEST invoice, detail renders, Cedolino iframe 'Cedolino pre-fattura' renders lines (TEST_Rossi/TEST_Bianchi), Fattura preview renders 4-col header; invoice deleted afterwards (200). expo-doctor: 20/20 checks passed. No deprecated packages (expo-av, expo-barcode-scanner, expo-background-fetch, @expo/vector-icons) found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Cedolino pre-fattura preview (web iframe, 390px)", "issues": ["Lines table now has 7 columns (Paziente, Codice, Tipo di lavorazione, Elemento, Q.tà, Prezzo, Importo) and overflows horizontally at mobile width — Q.TÀ/Prezzo/Importo cut off on the right in the preview. Not upgrade-related; cosmetic (A4 print is fine). Note header differs from iteration_10 (6 cols, 'Elem.') — confirm intended."]},
+      {"screen": "Declaration preview (DC 0003/2026)", "issues": ["Signature <img> shows a broken-image icon — signature_base64 on this seeded declaration appears invalid. Pre-existing test data, not upgrade-related."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [".screenshots/ (playwright screenshots)"],
+  "action_items": [
+    "Optional: make cedolino lines table fit mobile preview width (smaller font / table-layout:fixed) — cosmetic only.",
+    "Optional: verify Print.printAsync on web for batch export — window.print was invoked twice for a single print-selected tap (harmless in browser, but check for double invocation in exportDeclarationsBatchPdf)."
+  ],
+  "critical_code_review_comments": [
+    "Upgrade changes look correct: Ionicons default import from @react-native-vector-icons/ionicons, plugin registered in app.json, use-icon-fonts loads CDN font only under Expo Go with version matching package.json (14.0.0), StyleSheet.absoluteFill used in DateField.",
+    "Old metro errors in expo logs ('Cannot find module ... Assets.js', '@expo/metro-runtime/assets ENOENT', 'hermes-v0') predate the last Metro restart; current bundles succeed (1549 modules) with no new errors."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100%"},
+  "seed_data_creation": "Created 1 TEST invoice (TEST_Studio) for Cedolino preview and deleted it (DELETE 200). Wizard exited without saving; no declarations created.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "SDK 58 regression fully passed. Login tecnico@lab.it/password123. Ionicons check: filter leaf nodes whose computed fontFamily includes 'ionicons' and assert charCode >= 0xE000. Patch window.print in tests before print-selected. Wizard testIDs: decl-patient-name, wizard-next-button, add-work, work-category-<id>, work-subtype-<name>, work-save, decl-prescription-date, cal-*, date-backdrop (click with position {x:10,y:10}). Invoice for Cedolino: POST /api/invoices {client_snapshot:{name}, lines:[{description,quantity,unit_price,patient_name,codice_lavoro}]}."
+}

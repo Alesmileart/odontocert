@@ -1,7 +1,7 @@
 import React, { forwardRef, useImperativeHandle, useRef } from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import SignatureScreen, { SignatureViewRef } from "react-native-signature-canvas";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { AppText } from "@/src/components/ui";
 import { colors, fontSize, spacing, radius } from "@/src/theme";
 
