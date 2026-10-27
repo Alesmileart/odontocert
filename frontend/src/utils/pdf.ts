@@ -691,7 +691,32 @@ function invoiceStyles() {
   .notes { margin-top: 12px; font-size: 11px; color: #333; }
   .foot { margin-top: 22px; border-top: 1px solid #ccc; padding-top: 8px; font-size: 9.5px; color: #666; }
   .banner { background: #fff4d6; border: 1px solid #e0b400; color: #7a5b00; text-align: center; font-weight: bold; padding: 6px; border-radius: 6px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; }
-  .muted { color: #888; }`;
+  .muted { color: #888; }
+  /* Schermi stretti (anteprima su telefono): la stampa A4 non è interessata */
+  @media screen and (max-width: 600px) {
+    body { font-size: 13px; }
+    .sheet { padding: 14px 12px; border: none; }
+    .top { flex-direction: column; gap: 8px; }
+    .parties { flex-direction: column; gap: 10px; }
+    .totals table { min-width: 0; width: 100%; }
+    table.lines.ced thead { display: none; }
+    table.lines.ced, table.lines.ced tbody { display: block; width: 100%; }
+    table.lines.ced tr {
+      display: grid; grid-template-columns: 1fr auto auto; column-gap: 10px; row-gap: 2px;
+      grid-template-areas: "pat cod tot" "desc desc desc" "elem qty price";
+      border-bottom: 1px solid #ddd; padding: 8px 0;
+    }
+    table.lines.ced td { border: none; padding: 0; }
+    table.lines.ced td.c-pat { grid-area: pat; font-weight: bold; }
+    table.lines.ced td.c-cod { grid-area: cod; color: #555; font-size: 11px; align-self: center; }
+    table.lines.ced td.c-tot { grid-area: tot; font-weight: bold; }
+    table.lines.ced td.c-desc { grid-area: desc; }
+    table.lines.ced td.c-elem { grid-area: elem; font-size: 12px; }
+    table.lines.ced td.c-qty { grid-area: qty; color: #555; font-size: 11px; }
+    table.lines.ced td.c-price { grid-area: price; color: #555; font-size: 11px; }
+    table.lines.ced td.c-qty::before { content: "Q.tà "; }
+    table.lines.ced td.c-price::before { content: "Prezzo "; }
+  }`;
 }
 
 function invoicePartiesHtml(inv: InvoiceData, lab: LabProfile) {
@@ -796,13 +821,13 @@ export function buildInvoiceHtml(inv: InvoiceData, lab: LabProfile): string {
 function cedolinoLinesHtml(inv: InvoiceData) {
   const cell = (patient: string, codice: string, desc: string, elem: string, qty: number, price: number, tot: number) =>
     `<tr>
-        <td>${escapeHtml(patient || "—")}</td>
-        <td>${escapeHtml(codice || "—")}</td>
-        <td>${escapeHtml(desc || "—")}</td>
-        <td class="elems">${escapeHtml(elem)}</td>
-        <td class="num">${qty.toLocaleString("it-IT")}</td>
-        <td class="num">${fmtEur(price)}</td>
-        <td class="num">${fmtEur(tot)}</td>
+        <td class="c-pat">${escapeHtml(patient || "—")}</td>
+        <td class="c-cod">${escapeHtml(codice || "—")}</td>
+        <td class="c-desc">${escapeHtml(desc || "—")}</td>
+        <td class="elems c-elem">${escapeHtml(elem)}</td>
+        <td class="num c-qty">${qty.toLocaleString("it-IT")}</td>
+        <td class="num c-price">${fmtEur(price)}</td>
+        <td class="num c-tot">${fmtEur(tot)}</td>
       </tr>`;
 
   const rows = (inv.lines || [])
@@ -821,7 +846,7 @@ function cedolinoLinesHtml(inv: InvoiceData) {
     })
     .join("");
   return `
-  <table class="lines">
+  <table class="lines ced">
     <thead><tr><th>Paziente</th><th>Codice</th><th>Tipo di lavorazione</th><th>Elemento</th><th class="num">Q.tà</th><th class="num">Prezzo</th><th class="num">Importo</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="7" class="muted">Nessuna riga</td></tr>'}</tbody>
   </table>`;
@@ -833,7 +858,7 @@ export function buildCedolinoHtml(inv: InvoiceData, lab: LabProfile): string {
 <html lang="it">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=794, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>${invoiceStyles()}</style>
 </head>
 <body>

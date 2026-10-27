@@ -67,3 +67,6 @@
 ## Password dimenticata (Jun 2026)
 - Link su login, /forgot-password e /reset-password; email via Emergent managed Resend (backend/email_service.py), token hash sha256, scade 1h, monouso, messaggio generico anti-enumerazione, throttle 1/min
 - APP_PUBLIC_URL in backend/.env per il link (aggiornare al dominio di produzione dopo il deploy)
+
+## Cedolino leggibile su telefono (Jun 2026)
+- media query <600px: righe a scheda (paziente/codice/importo, lavorazione, elemento/Q.tà/prezzo); PDF A4 invariato; PdfPreview non forza viewport 800 per documenti device-width

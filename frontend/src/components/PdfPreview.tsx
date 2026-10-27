@@ -24,7 +24,9 @@ export function PdfPreview({
   sharing?: boolean;
 }) {
   const insets = useSafeAreaInsets();
-  const source = { html: html.replace("<head>", `<head>${VIEWPORT_META}`) };
+  // Documents that adapt to the phone width (e.g. Cedolino) declare device-width themselves.
+  const responsive = html.includes('content="width=device-width');
+  const source = { html: responsive ? html : html.replace("<head>", `<head>${VIEWPORT_META}`) };
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
