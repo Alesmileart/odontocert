@@ -99,6 +99,17 @@ export default function Login() {
           }
         />
 
+        <Pressable
+          style={styles.forgot}
+          onPress={() => router.push("/(auth)/forgot-password")}
+          hitSlop={8}
+          testID="go-to-forgot-password"
+        >
+          <AppText variant="semibold" size={fontSize.sm} color={colors.brandPrimary}>
+            Password dimenticata?
+          </AppText>
+        </Pressable>
+
         <Button title="Accedi" onPress={onSubmit} loading={loading} testID="login-submit-button" />
 
         <Pressable
@@ -135,5 +146,6 @@ const styles = StyleSheet.create({
   form: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing["3xl"] },
   title: { marginBottom: spacing.xs },
   subtitle: { marginBottom: spacing.xl },
+  forgot: { alignSelf: "flex-end", minHeight: 44, justifyContent: "center", marginTop: -spacing.sm, marginBottom: spacing.sm },
   switchRow: { flexDirection: "row", justifyContent: "center", marginTop: spacing.xl },
 });

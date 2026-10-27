@@ -17,6 +17,15 @@ from datetime import datetime, timezone, timedelta
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+import hashlib  # noqa: E402
+import secrets  # noqa: E402
+from html import escape  # noqa: E402
+from fastapi import BackgroundTasks  # noqa: E402
+from email_service import send_email, EMAIL_FROM_NAME  # noqa: E402
+
+APP_PUBLIC_URL = os.environ["APP_PUBLIC_URL"].rstrip("/")
+RESET_TOKEN_TTL = timedelta(hours=1)
+
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -275,6 +284,81 @@ async def login(data: LoginInput):
         raise HTTPException(status_code=401, detail="Email o password non corretti")
     token = create_access_token(user["id"])
     return AuthOut(access_token=token, user=UserOut(id=user["id"], email=user["email"], name=user["name"]))
+
+
+class ForgotPasswordInput(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordInput(BaseModel):
+    token: str = Field(min_length=10)
+    password: str = Field(min_length=6)
+
+
+FORGOT_MESSAGE = "Se l'email esiste, riceverai un link per reimpostare la password."
+
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+async def _send_reset_email(user: dict) -> None:
+    # Throttle: at most one reset email per user per minute.
+    recent = await db.password_resets.find_one({
+        "user_id": user["id"],
+        "created_at": {"$gt": (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()},
+    })
+    if recent:
+        return
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    await db.password_resets.update_many({"user_id": user["id"], "used": False}, {"$set": {"used": True}})
+    await db.password_resets.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "token_hash": _hash_token(token),
+        "created_at": now.isoformat(),
+        "expires_at": (now + RESET_TOKEN_TTL).isoformat(),
+        "used": False,
+    })
+    link = f"{APP_PUBLIC_URL}/reset-password?token={token}"
+    brand = escape(EMAIL_FROM_NAME)
+    html = (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+        '<td style="padding:24px;font-family:Arial,sans-serif;color:#1d2420">'
+        f'<h2 style="margin:0 0 16px">{brand}</h2>'
+        f'<p>Ciao {escape(user.get("name") or "")},</p>'
+        '<p>Abbiamo ricevuto una richiesta di reimpostazione della password del tuo account.</p>'
+        f'<p style="margin:24px 0"><a href="{escape(link)}" style="background:#2F4A3F;color:#ffffff;'
+        'padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Scegli una nuova password</a></p>'
+        '<p>Il link è valido per 1 ora e può essere usato una sola volta.</p>'
+        "<p>Se non hai richiesto tu il cambio password, ignora questa email: la tua password resterà invariata.</p>"
+        f'<p style="font-size:12px;color:#888">Inviato da {brand}. Non ti chiederemo mai la password via email.</p>'
+        "</td></tr></table>"
+    )
+    await send_email(to=user["email"], subject=f"{EMAIL_FROM_NAME} – Reimposta la password", html=html)
+
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(data: ForgotPasswordInput, background: BackgroundTasks):
+    user = await db.users.find_one({"email": data.email.lower()})
+    if user:
+        # Sent in background so response time does not reveal whether the email exists.
+        background.add_task(_send_reset_email, user)
+    return {"message": FORGOT_MESSAGE}
+
+
+@api_router.post("/auth/reset-password")
+async def reset_password(data: ResetPasswordInput):
+    invalid = HTTPException(status_code=400, detail="Link non valido o scaduto. Richiedi un nuovo link.")
+    rec = await db.password_resets.find_one({"token_hash": _hash_token(data.token), "used": False})
+    if not rec or datetime.fromisoformat(rec["expires_at"]) < datetime.now(timezone.utc):
+        raise invalid
+    result = await db.password_resets.update_one({"id": rec["id"], "used": False}, {"$set": {"used": True}})
+    if result.modified_count != 1:
+        raise invalid
+    await db.users.update_one({"id": rec["user_id"]}, {"$set": {"password_hash": hash_password(data.password)}})
+    return {"message": "Password aggiornata. Ora puoi accedere con la nuova password."}
 
 
 @api_router.get("/auth/me", response_model=UserOut)
@@ -807,6 +891,12 @@ app.add_middleware(
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+async def ensure_indexes():
+    await db.password_resets.create_index("token_hash")
+    await db.password_resets.create_index("user_id")
 
 
 @app.on_event("shutdown")

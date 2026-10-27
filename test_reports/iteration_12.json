@@ -1,0 +1,38 @@
+{
+  "summary": "Tested the password reset feature end to end: the backend through the public URL, the frontend at 390x844. All 10 backend tests pass: the forgot-password response is the same for existing and unknown emails, tokens are stored as sha256 hashes and expire after 1h, the 1-per-minute throttle and invalidation of older links work, invalid/expired/reused tokens return 400, the old password stops working and the new one logs in. On the frontend, the login screen shows only Email and Password plus the 'Password dimenticata?' link (44px tall) that opens /forgot-password. The same success message shows for existing and unknown emails, and invalid email format shows an error toast. On /reset-password the missing-token message, invalid-token toast, too-short and mismatch toasts, success message, and login with the new password all work. Regular login (tecnico@lab.it) works. Found 3 minor issues, none blocking.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "db.password_resets", "issue": "The collection has no indexes (only _id). Add an index on token_hash and a TTL index on expires_at (requires storing expires_at as a Date) so old records are cleaned up."},
+      {"endpoint": "POST /api/auth/reset-password", "issue": "Existing JWTs (30-day lifetime) stay valid after a password reset, so a stolen session survives the reset. Consider token versioning or revocation."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "forgot-password back chevron", "issue": "Opening /forgot-password directly (no history) and tapping the back chevron does nothing because router.back() has nowhere to go. Fall back to router.replace('/(auth)/login') when router.canGoBack() is false. Reference: app/(auth)/forgot-password.tsx:40", "testID": "forgot-back", "priority": "low"},
+      {"component": "forgot-password 'Torna all’accesso'", "issue": "router.replace('/(auth)/login') runs while the original login screen is still in the stack, so 2 login screens end up mounted (2 login-email-input elements in the DOM). Use router.back() when canGoBack, or router.dismissTo. Reference: app/(auth)/forgot-password.tsx:75", "testID": "forgot-go-to-login", "priority": "low"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "reset-password / forgot-password", "issues": ["The error toast at the top covers the screen title ('Scegli una nuova password') while it is visible. It is cosmetic only."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_password_reset.py", "/app/test_reports/pytest/pytest_password_reset.xml"],
+  "action_items": [
+    "Low: forgot-password back chevron should fall back to the login screen when there is no history (forgot-password.tsx:40)",
+    "Low: avoid stacking a second login screen from 'Torna all’accesso' (forgot-password.tsx:75)",
+    "Optional: add indexes on password_resets (token_hash, TTL on expires_at); consider invalidating existing sessions after a reset"
+  ],
+  "critical_code_review_comments": [
+    "Email is sent in a BackgroundTask, so response time does not reveal whether an email is registered. Good.",
+    "The token is marked used with a conditional update_one ({used: False}), so concurrent use of the same token is prevented. Good.",
+    "datetime.fromisoformat(rec['expires_at']) compared against an aware now(): a naive expires_at string would raise TypeError and a 500. The server always writes aware ISO strings, so this only matters for manual inserts."
+  ],
+  "updated_files": ["/app/backend/tests/test_password_reset.py"],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% of requested flows; 2 low-priority navigation issues"},
+  "seed_data_creation": "TEST_ password_resets docs were inserted for tokens and then deleted. The delivered@resend.dev password was restored to newpass1 (verified login 200). tecnico@lab.it is unchanged.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run test_password_reset.py with -n0: pytest-xdist parallel workers interfere through the shared teardown. Get valid tokens by inserting {token_hash: sha256(token), created_at:'2000-01-01T00:00:00+00:00', expires_at: aware ISO in the future, used:false}. The 2 login instances after 'Torna all’accesso' require using ':visible' selectors."
+}

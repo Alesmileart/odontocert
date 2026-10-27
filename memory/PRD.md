@@ -63,3 +63,7 @@
 - expo 58.0.17, react-native 0.88, react 19.3, expo-router ~58
 - @expo/vector-icons replaced by @react-native-vector-icons/ionicons; app.json cleaned (newArchEnabled/edgeToEdgeEnabled)
 - expo-doctor 20/20; frontend regression iteration_11 passed
+
+## Password dimenticata (Jun 2026)
+- Link su login, /forgot-password e /reset-password; email via Emergent managed Resend (backend/email_service.py), token hash sha256, scade 1h, monouso, messaggio generico anti-enumerazione, throttle 1/min
+- APP_PUBLIC_URL in backend/.env per il link (aggiornare al dominio di produzione dopo il deploy)
